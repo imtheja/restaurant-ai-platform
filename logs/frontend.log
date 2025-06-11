@@ -3,9 +3,7 @@
 > vite
 
 
-  VITE v5.4.19  ready in 68 ms
+  VITE v5.4.19  ready in 62 ms
 
   ➜  Local:   http://localhost:3000/
-  ➜  Network: http://169.254.153.71:3000/
   ➜  Network: http://192.168.4.134:3000/
-  ➜  Network: http://169.254.52.215:3000/
