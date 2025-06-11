@@ -89,7 +89,8 @@ echo "✅ Redis is ready!"
 # Initialize database
 echo "🗄️  Initializing database..."
 cd backend
-python3 ../scripts/init_db.py
+source venv/bin/activate
+python ../scripts/init_db.py
 cd ..
 
 # Start backend services in the background
