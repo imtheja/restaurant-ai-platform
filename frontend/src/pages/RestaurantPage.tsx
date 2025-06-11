@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
-import { Box, Container, Grid, Paper, Typography, Skeleton } from '@mui/material';
+import { Box, Container, Grid, Paper, Skeleton } from '@mui/material';
 import { useQuery } from 'react-query';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -18,11 +18,10 @@ import { restaurantApi } from '@services/api';
 import { useThemeStore } from '@store/themeStore';
 
 // Types
-import { Restaurant } from '@types/index';
+import { Restaurant } from '../types';
 
 const RestaurantPage: React.FC = () => {
   const { restaurantSlug } = useParams<{ restaurantSlug: string }>();
-  const location = useLocation();
   const { setRestaurantTheme } = useThemeStore();
   const [chatSendMessage, setChatSendMessage] = React.useState<((message: string) => void) | null>(null);
 
@@ -35,14 +34,14 @@ const RestaurantPage: React.FC = () => {
     error: restaurantError,
   } = useQuery<Restaurant>(
     ['restaurant', restaurantSlug],
-    () => restaurantApi.getBySlug(restaurantSlug!),
+    () => restaurantApi.getBySlug(restaurantSlug!) as Promise<Restaurant>,
     {
       enabled: !!restaurantSlug,
       onSuccess: (data) => {
         // Update theme based on restaurant branding
         setRestaurantTheme(data);
       },
-      onError: (error: Error) => {
+      onError: (error: any) => {
         toast.error(error.message || 'Failed to load restaurant');
       },
     }
@@ -51,7 +50,6 @@ const RestaurantPage: React.FC = () => {
   // Fetch avatar configuration
   const {
     data: avatarConfig,
-    isLoading: avatarLoading,
   } = useQuery(
     ['avatar', restaurantSlug],
     () => restaurantApi.getAvatarConfig(restaurantSlug!),
@@ -63,7 +61,7 @@ const RestaurantPage: React.FC = () => {
   // Set page title
   useEffect(() => {
     if (restaurant) {
-      document.title = `${restaurant.name} - Restaurant AI`;
+      document.title = `${(restaurant as any).name} - Restaurant AI`;
     }
   }, [restaurant]);
 
@@ -71,8 +69,8 @@ const RestaurantPage: React.FC = () => {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <ErrorMessage 
-          message="Restaurant not found" 
-          description="The restaurant you're looking for doesn't exist or is currently unavailable."
+          title="Restaurant not found"
+          message="The restaurant you're looking for doesn't exist or is currently unavailable."
         />
       </Container>
     );
@@ -103,7 +101,7 @@ const RestaurantPage: React.FC = () => {
       <Container maxWidth="lg" sx={{ py: 2 }}>
         {/* Restaurant Header */}
         <RestaurantHeader 
-          restaurant={restaurant!} 
+          restaurant={restaurant as any} 
         />
 
         {/* Main Content - Full width menu */}

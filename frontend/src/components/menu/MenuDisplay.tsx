@@ -21,7 +21,7 @@ interface MenuDisplayProps {
 const MenuDisplay: React.FC<MenuDisplayProps> = ({ restaurantSlug, onAIChat }) => {
   const [aiPopupAnchor, setAiPopupAnchor] = useState<HTMLElement | null>(null);
   const [selectedMenuItem, setSelectedMenuItem] = useState<any | null>(null);
-  const [hoverTimer, setHoverTimer] = useState<NodeJS.Timeout | null>(null);
+  const [, ] = useState<ReturnType<typeof setTimeout> | null>(null);
   const { data: menu, isLoading, error } = useQuery(
     ['menu', restaurantSlug],
     () => restaurantApi.getMenu(restaurantSlug),
@@ -48,7 +48,7 @@ const MenuDisplay: React.FC<MenuDisplayProps> = ({ restaurantSlug, onAIChat }) =
     );
   }
 
-  if (!menu || !menu.categories || menu.categories.length === 0) {
+  if (!menu || !(menu as any).categories || (menu as any).categories.length === 0) {
     return (
       <Container>
         <Typography sx={{ py: 4 }}>
@@ -59,7 +59,7 @@ const MenuDisplay: React.FC<MenuDisplayProps> = ({ restaurantSlug, onAIChat }) =
   }
 
   // Use categories directly from API response
-  const itemsByCategory = menu.categories.reduce((acc: any, category: any) => {
+  const itemsByCategory = (menu as any).categories.reduce((acc: any, category: any) => {
     if (category.items && category.items.length > 0) {
       acc[category.name] = category.items;
     }

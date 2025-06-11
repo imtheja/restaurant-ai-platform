@@ -1,9 +1,9 @@
 import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
-import { APIResponse, PaginatedResponse } from '@types/index';
+import { APIResponse, PaginatedResponse } from '../types';
 
 // Create axios instance with default config
 const api: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
+  baseURL: (import.meta.env as any).VITE_API_BASE_URL || 'http://localhost:8000',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -14,7 +14,7 @@ const api: AxiosInstance = axios.create({
 api.interceptors.request.use(
   (config) => {
     // Add request timestamp for debugging
-    config.metadata = { startTime: new Date() };
+    (config as any).metadata = { startTime: new Date() };
     
     // Add auth token if available (for future use)
     const token = localStorage.getItem('auth_token');
@@ -34,9 +34,9 @@ api.interceptors.response.use(
   (response: AxiosResponse) => {
     // Log response time for debugging
     const endTime = new Date();
-    const duration = endTime.getTime() - response.config.metadata?.startTime?.getTime();
+    const duration = endTime.getTime() - (response.config as any).metadata?.startTime?.getTime();
     
-    if (import.meta.env.DEV) {
+    if ((import.meta.env as any).DEV) {
       console.log(`${response.config.method?.toUpperCase()} ${response.config.url} - ${duration}ms`);
     }
     

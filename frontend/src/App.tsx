@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CssBaseline, Box } from '@mui/material';
@@ -154,7 +153,7 @@ function App() {
           />
           
           {/* React Query DevTools */}
-          {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+          {(import.meta.env as any).DEV && <ReactQueryDevtools initialIsOpen={false} />}
         </ThemeProvider>
       </QueryClientProvider>
     </ErrorBoundary>

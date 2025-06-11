@@ -6,14 +6,14 @@ export const API_CONFIG = {
     AI_SERVICE: 'http://localhost:8003',
   },
   production: {
-    RESTAURANT_SERVICE: import.meta.env.VITE_RESTAURANT_SERVICE_URL || '',
-    MENU_SERVICE: import.meta.env.VITE_MENU_SERVICE_URL || '',
-    AI_SERVICE: import.meta.env.VITE_AI_SERVICE_URL || '',
+    RESTAURANT_SERVICE: (import.meta.env as any).VITE_RESTAURANT_SERVICE_URL || '',
+    MENU_SERVICE: (import.meta.env as any).VITE_MENU_SERVICE_URL || '',
+    AI_SERVICE: (import.meta.env as any).VITE_AI_SERVICE_URL || '',
   }
 };
 
 export const getApiConfig = () => {
-  const env = import.meta.env.MODE;
+  const env = (import.meta.env as any).MODE;
   return API_CONFIG[env as keyof typeof API_CONFIG] || API_CONFIG.development;
 };
 

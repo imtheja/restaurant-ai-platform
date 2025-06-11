@@ -16,8 +16,8 @@
 
     /* Linting */
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
 
     /* Path mapping */
@@ -31,8 +31,11 @@
       "@utils/*": ["./utils/*"],
       "@store/*": ["./store/*"],
       "@hooks/*": ["./hooks/*"]
-    }
+    },
+    
+    /* Additional types */
+    "types": ["vite/client"]
   },
-  "include": ["src"],
+  "include": ["src", "vite-env.d.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

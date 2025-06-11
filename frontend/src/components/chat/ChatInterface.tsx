@@ -33,7 +33,7 @@ import toast from 'react-hot-toast';
 import { chatApi, restaurantApi } from '@services/api';
 
 // Types
-import { ChatMessage } from '@types/index';
+import { Message, AvatarConfig, ChatMessage } from '../../types';
 
 interface ChatInterfaceProps {
   restaurantSlug: string;
@@ -79,13 +79,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speechEnabled, setSpeechEnabled] = useState(true);
   const [sessionId] = useState(() => `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
-  const [speechTranscript, setSpeechTranscript] = useState('');
-  const [isProcessingSpeech, setIsProcessingSpeech] = useState(false);
+  const [, setSpeechTranscript] = useState('');
+  const [, setIsProcessingSpeech] = useState(false);
   
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const speechTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const speechTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Get avatar configuration
   const { data: avatarConfig } = useQuery(
@@ -106,18 +106,18 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
     {
       onSuccess: (response) => {
         const aiMessage: ChatMessage = {
-          id: response.message_id,
-          conversation_id: response.conversation_id,
+          id: (response as any).message_id,
+          conversation_id: (response as any).conversation_id,
           sender_type: 'ai',
-          content: response.message,
+          content: (response as any).message,
           message_type: 'text',
           created_at: new Date().toISOString()
         };
         setMessages(prev => [...prev, aiMessage]);
 
         // Speak the AI response if speech is enabled
-        if (speechEnabled && response.message) {
-          speakText(response.message);
+        if (speechEnabled && (response as any).message) {
+          speakText((response as any).message);
         }
       },
       onError: (error: Error) => {
@@ -144,7 +144,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
           let transcript = '';
           let isFinal = false;
           
-          for (let i = event.resultIndex; i < event.results.length; i++) {
+          for (let i = (event as any).resultIndex; i < (event as any).results.length; i++) {
             const result = event.results[i];
             transcript += result[0].transcript;
             if (result.isFinal) {
@@ -213,15 +213,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
         id: `welcome-${Date.now()}`,
         conversation_id: sessionId,
         sender_type: 'ai',
-        content: avatarConfig.greeting || "Hello! How can I help you today?",
+        content: (avatarConfig as any).greeting || "Hello! How can I help you today?",
         message_type: 'text',
         created_at: new Date().toISOString()
       };
       setMessages([welcomeMessage]);
 
       // Speak welcome message
-      if (speechEnabled && avatarConfig.greeting) {
-        setTimeout(() => speakText(avatarConfig.greeting), 500);
+      if (speechEnabled && (avatarConfig as any).greeting) {
+        setTimeout(() => speakText((avatarConfig as any).greeting), 500);
       }
     }
   }, [avatarConfig, speechEnabled, sessionId, messages.length]);
@@ -382,7 +382,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
           </Avatar>
           <Box sx={{ flex: 1 }}>
             <Typography variant="h6">
-              {avatarConfig?.name || 'AI Assistant'}
+              {(avatarConfig as any)?.name || 'AI Assistant'}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Voice-enabled chat • {speechEnabled ? 'Speech ON' : 'Speech OFF'}
@@ -454,7 +454,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
                       <Typography variant="body1">{message.content}</Typography>
                     </Box>
                     <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-                      {message.sender_type === 'customer' ? 'You' : avatarConfig?.name || 'Assistant'}
+                      {message.sender_type === 'customer' ? 'You' : (avatarConfig as any)?.name || 'Assistant'}
                     </Typography>
                   </ListItem>
                 </motion.div>

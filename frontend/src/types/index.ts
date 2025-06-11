@@ -102,6 +102,9 @@ export interface ChatMessage {
   created_at: string;
 }
 
+// Alias for compatibility
+export type Message = ChatMessage;
+
 export interface Conversation {
   id: string;
   restaurant_id: string;

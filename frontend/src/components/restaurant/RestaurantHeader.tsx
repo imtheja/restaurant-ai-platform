@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Typography, Chip, Container } from '@mui/material';
-import { Restaurant } from '@types/index';
+import { Restaurant } from '../../types';
 
 interface RestaurantHeaderProps {
   restaurant: Restaurant;
