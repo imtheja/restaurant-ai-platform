@@ -10,7 +10,16 @@ const api: AxiosInstance = axios.create({
   },
 });
 
-// Request interceptor
+// Create separate AI service instance
+const aiApi: AxiosInstance = axios.create({
+  baseURL: (import.meta.env as any).VITE_AI_SERVICE_URL || 'http://localhost:8002',
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Request interceptor for main API
 api.interceptors.request.use(
   (config) => {
     // Add request timestamp for debugging
@@ -29,7 +38,26 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor
+// Request interceptor for AI API
+aiApi.interceptors.request.use(
+  (config) => {
+    // Add request timestamp for debugging
+    (config as any).metadata = { startTime: new Date() };
+    
+    // Add auth token if available (for future use)
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor for main API
 api.interceptors.response.use(
   (response: AxiosResponse) => {
     // Log response time for debugging
@@ -38,6 +66,36 @@ api.interceptors.response.use(
     
     if ((import.meta.env as any).DEV) {
       console.log(`${response.config.method?.toUpperCase()} ${response.config.url} - ${duration}ms`);
+    }
+    
+    return response;
+  },
+  (error: AxiosError) => {
+    // Handle common errors
+    if (error.response?.status === 401) {
+      // Unauthorized - clear auth token
+      localStorage.removeItem('auth_token');
+      // Redirect to login if needed
+    }
+    
+    if (error.response?.status === 429) {
+      // Rate limited
+      console.warn('Rate limit exceeded');
+    }
+    
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor for AI API
+aiApi.interceptors.response.use(
+  (response: AxiosResponse) => {
+    // Log response time for debugging
+    const endTime = new Date();
+    const duration = endTime.getTime() - (response.config as any).metadata?.startTime?.getTime();
+    
+    if ((import.meta.env as any).DEV) {
+      console.log(`AI ${response.config.method?.toUpperCase()} ${response.config.url} - ${duration}ms`);
     }
     
     return response;
@@ -147,7 +205,7 @@ export const restaurantApi = {
   },
 };
 
-// Chat API
+// Chat API (uses AI service)
 export const chatApi = {
   // Send chat message
   sendMessage: async (restaurantSlug: string, data: {
@@ -156,7 +214,7 @@ export const chatApi = {
     context?: Record<string, any>;
   }) => {
     try {
-      const response = await api.post(`/api/v1/restaurants/${restaurantSlug}/chat`, data);
+      const response = await aiApi.post(`/api/v1/restaurants/${restaurantSlug}/chat`, data);
       return handleApiResponse(response);
     } catch (error) {
       handleApiError(error as AxiosError);
@@ -166,7 +224,7 @@ export const chatApi = {
   // Get conversation suggestions
   getSuggestions: async (restaurantSlug: string, context?: string) => {
     try {
-      const response = await api.get(`/api/v1/restaurants/${restaurantSlug}/chat/suggestions`, {
+      const response = await aiApi.get(`/api/v1/restaurants/${restaurantSlug}/chat/suggestions`, {
         params: { context }
       });
       return handleApiResponse(response);
@@ -178,7 +236,7 @@ export const chatApi = {
   // Submit feedback
   submitFeedback: async (restaurantSlug: string, feedbackData: Record<string, any>) => {
     try {
-      const response = await api.post(`/api/v1/restaurants/${restaurantSlug}/chat/feedback`, feedbackData);
+      const response = await aiApi.post(`/api/v1/restaurants/${restaurantSlug}/chat/feedback`, feedbackData);
       return handleApiResponse(response);
     } catch (error) {
       handleApiError(error as AxiosError);
@@ -188,7 +246,7 @@ export const chatApi = {
   // Get chat analytics
   getAnalytics: async (restaurantSlug: string, days: number = 7) => {
     try {
-      const response = await api.get(`/api/v1/restaurants/${restaurantSlug}/chat/analytics`, {
+      const response = await aiApi.get(`/api/v1/restaurants/${restaurantSlug}/chat/analytics`, {
         params: { days }
       });
       return handleApiResponse(response);
