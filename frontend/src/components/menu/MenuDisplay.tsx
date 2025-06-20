@@ -15,7 +15,7 @@ import MenuItemAIPopup from './MenuItemAIPopup';
 
 interface MenuDisplayProps {
   restaurantSlug: string;
-  onAIChat?: (question: string, menuItem?: any) => void;
+  onAIChat?: (question: string, menuItem?: any, context?: any) => void;
 }
 
 const MenuDisplay: React.FC<MenuDisplayProps> = ({ restaurantSlug, onAIChat }) => {
@@ -242,8 +242,15 @@ const MenuDisplay: React.FC<MenuDisplayProps> = ({ restaurantSlug, onAIChat }) =
         }}
         menuItem={selectedMenuItem || {}}
         onAskAI={(question, menuItem) => {
+          console.log('MenuDisplay: AI button clicked, question:', question);
           if (onAIChat) {
-            onAIChat(question, menuItem);
+            console.log('MenuDisplay: Calling onAIChat with question and menu item context');
+            onAIChat(question, menuItem, { 
+              source: 'menu_item_popup',
+              menu_item: menuItem 
+            });
+          } else {
+            console.warn('MenuDisplay: onAIChat callback is not available');
           }
         }}
       />

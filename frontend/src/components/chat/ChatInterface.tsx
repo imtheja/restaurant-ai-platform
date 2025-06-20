@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -14,7 +14,11 @@ import {
   Chip,
   CircularProgress,
   Fab,
-  Tooltip
+  Tooltip,
+  Menu,
+  MenuItem,
+  FormControl,
+  Select
 } from '@mui/material';
 import {
   Mic,
@@ -23,7 +27,8 @@ import {
   VolumeUp,
   VolumeOff,
   Person,
-  SmartToy
+  SmartToy,
+  Settings
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation } from 'react-query';
@@ -37,7 +42,7 @@ import { Message, AvatarConfig, ChatMessage } from '../../types';
 
 interface ChatInterfaceProps {
   restaurantSlug: string;
-  onChatReady?: (sendMessage: (message: string) => void) => void;
+  onChatReady?: (sendMessage: (message: string, context?: any) => void) => void;
   isEmbedded?: boolean;
 }
 
@@ -81,11 +86,19 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
   const [sessionId] = useState(() => `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
   const [, setSpeechTranscript] = useState('');
   const [, setIsProcessingSpeech] = useState(false);
+  const [selectedVoice, setSelectedVoice] = useState('nova'); // Default to nova for bakery
+  const [showVoiceMenu, setShowVoiceMenu] = useState(false);
+  const [voiceMenuAnchor, setVoiceMenuAnchor] = useState<null | HTMLElement>(null);
   
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const speechTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const speechQueueRef = useRef<string[]>([]);
+  const currentSpeechRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   // Get avatar configuration
   const { data: avatarConfig } = useQuery(
@@ -96,12 +109,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
     }
   );
 
+  // Get available voices
+  const { data: availableVoices } = useQuery(
+    ['voices'],
+    () => chatApi.getAvailableVoices(),
+    {
+      staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    }
+  );
+
   // Send message mutation
   const sendMessageMutation = useMutation(
-    (message: string) => chatApi.sendMessage(restaurantSlug, {
+    ({ message, context }: { message: string, context?: any }) => chatApi.sendMessage(restaurantSlug, {
       message,
       session_id: sessionId,
-      context: { source: 'voice_chat' }
+      context: context || { source: 'voice_chat' }
     }),
     {
       onSuccess: (response) => {
@@ -117,7 +139,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
 
         // Speak the AI response if speech is enabled
         if (speechEnabled && (response as any).message) {
-          speakText((response as any).message);
+          speakTextWithOpenAI((response as any).message);
         }
       },
       onError: (error: Error) => {
@@ -126,10 +148,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
     }
   );
 
-  // Initialize speech recognition
+  // Initialize speech recognition and audio
   useEffect(() => {
     if (typeof window !== 'undefined') {
       synthRef.current = window.speechSynthesis;
+      
+      // Initialize media recorder for OpenAI Whisper
+      initializeMediaRecorder();
       
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SpeechRecognition) {
@@ -183,8 +208,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
         recognition.onend = () => {
           setIsListening(false);
         };
-      } else {
-        toast.error('Speech recognition not supported in this browser');
       }
     }
 
@@ -195,9 +218,19 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
       if (synthRef.current) {
         synthRef.current.cancel();
       }
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
       if (speechTimeoutRef.current) {
         clearTimeout(speechTimeoutRef.current);
       }
+      // Clear speech queue
+      speechQueueRef.current = [];
+      currentSpeechRef.current = null;
     };
   }, []);
 
@@ -206,60 +239,225 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Add welcome message when avatar config loads
+  // Add welcome message when avatar config loads (only once per component mount, and only for non-embedded instances)
   useEffect(() => {
-    if (avatarConfig && messages.length === 0) {
+    if (avatarConfig && messages.length === 0 && !isEmbedded) {
+      const welcomeKey = `welcomed-${restaurantSlug}`;
+      const hasBeenWelcomed = sessionStorage.getItem(welcomeKey);
+      
+      let welcomeContent;
+      if (hasBeenWelcomed) {
+        // Very short greeting for returning users within the same session
+        welcomeContent = "Hi! How can I help?";
+      } else {
+        // First-time welcome - use short greeting for menu interactions  
+        welcomeContent = "Hi! I'm Baker Betty from The Cookie Jar. What can I help you with?";
+        sessionStorage.setItem(welcomeKey, 'true');
+      }
+
       const welcomeMessage: ChatMessage = {
         id: `welcome-${Date.now()}`,
         conversation_id: sessionId,
         sender_type: 'ai',
-        content: (avatarConfig as any).greeting || "Hello! How can I help you today?",
+        content: welcomeContent,
         message_type: 'text',
         created_at: new Date().toISOString()
       };
       setMessages([welcomeMessage]);
 
-      // Speak welcome message
-      if (speechEnabled && (avatarConfig as any).greeting) {
-        setTimeout(() => speakText((avatarConfig as any).greeting), 500);
+      // Speak welcome message since this is the main (non-embedded) instance
+      if (speechEnabled && welcomeContent) {
+        setTimeout(() => speakTextWithOpenAI(welcomeContent), 500);
       }
     }
-  }, [avatarConfig, speechEnabled, sessionId, messages.length]);
+  }, [avatarConfig, sessionId, restaurantSlug]); // Removed speechEnabled and messages.length dependencies
 
-  // Expose sendMessage function to parent
-  useEffect(() => {
-    if (onChatReady) {
-      onChatReady(sendMessage);
+  const initializeMediaRecorder = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm;codecs=opus'
+      });
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+      
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        audioChunksRef.current = [];
+        
+        // Send to OpenAI Whisper
+        await transcribeWithWhisper(audioBlob);
+      };
+      
+      mediaRecorderRef.current = mediaRecorder;
+    } catch (error) {
+      console.error('Failed to initialize media recorder:', error);
     }
-  }, [onChatReady]);
+  };
+
+  const transcribeWithWhisper = async (audioBlob: Blob) => {
+    try {
+      setIsProcessingSpeech(true);
+      
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'recording.webm');
+      
+      const response = await chatApi.transcribeAudio(formData);
+      
+      if (response.data?.transcript) {
+        const transcript = autoCorrectSpeech(response.data.transcript.trim());
+        setInputMessage(transcript);
+        
+        // Auto-send the message
+        setTimeout(() => {
+          sendMessage(transcript);
+          setInputMessage('');
+        }, 500);
+      }
+    } catch (error) {
+      console.error('Transcription failed:', error);
+      toast.error('Speech transcription failed. Please try again.');
+    } finally {
+      setIsProcessingSpeech(false);
+    }
+  };
+
+  const processNextSpeech = () => {
+    if (speechQueueRef.current.length === 0) {
+      setIsSpeaking(false);
+      currentSpeechRef.current = null;
+      return;
+    }
+    
+    const text = speechQueueRef.current.shift()!;
+    const cleanText = text
+      .replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!cleanText) {
+      processNextSpeech();
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.volume = 0.8;
+    
+    currentSpeechRef.current = utterance;
+    
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => {
+      currentSpeechRef.current = null;
+      processNextSpeech(); // Process next in queue
+    };
+    utterance.onerror = () => {
+      currentSpeechRef.current = null;
+      processNextSpeech(); // Process next in queue
+    };
+    
+    if (synthRef.current) {
+      synthRef.current.speak(utterance);
+    }
+  };
+
+  const speakTextWithOpenAI = async (text: string) => {
+    if (!speechEnabled) return;
+
+    try {
+      // Stop any current browser speech synthesis
+      if (synthRef.current) {
+        synthRef.current.cancel();
+      }
+      
+      // Clear browser speech queue
+      speechQueueRef.current = [];
+      currentSpeechRef.current = null;
+      
+      setIsSpeaking(true);
+      
+      const response = await chatApi.synthesizeSpeech({
+        text: text,
+        voice: selectedVoice,
+        restaurant_slug: restaurantSlug
+      });
+      
+      // Stop any current audio
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
+      }
+      
+      // Create audio from the response
+      const audioBlob = new Blob([response.data], { type: 'audio/mpeg' });
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      
+      currentAudioRef.current = audio;
+      
+      audio.onended = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+        currentAudioRef.current = null;
+      };
+      
+      audio.onerror = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+        currentAudioRef.current = null;
+        toast.error('Speech playback failed');
+      };
+      
+      await audio.play();
+      
+    } catch (error) {
+      console.error('OpenAI speech synthesis failed:', error);
+      setIsSpeaking(false);
+      // Fallback to browser speech synthesis only if OpenAI completely fails
+      speakText(text);
+    }
+  };
 
   const speakText = (text: string) => {
     if (!synthRef.current || !speechEnabled) return;
 
-    // Cancel any ongoing speech
-    synthRef.current.cancel();
-
-    // Remove emojis and clean text for speech
-    const cleanText = text
-      .replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '') // Remove emojis
-      .replace(/\s+/g, ' ') // Clean up extra spaces
-      .trim();
-
-    if (!cleanText) return;
-
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.rate = 1.0; // Normal speed, not anxious
-    utterance.pitch = 1.0; // Normal pitch
-    utterance.volume = 0.8;
-
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-
-    synthRef.current.speak(utterance);
+    // Add to queue instead of immediately speaking
+    speechQueueRef.current.push(text);
+    
+    // If nothing is currently speaking, start processing
+    if (!currentSpeechRef.current) {
+      processNextSpeech();
+    }
   };
 
   const startListening = () => {
+    // Try OpenAI Whisper first, fallback to browser speech recognition
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'inactive') {
+      try {
+        setInputMessage('');
+        setIsListening(true);
+        audioChunksRef.current = [];
+        mediaRecorderRef.current.start();
+        
+        // Auto-stop after 30 seconds
+        setTimeout(() => {
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            stopListening();
+          }
+        }, 30000);
+        
+        return;
+      } catch (error) {
+        console.error('MediaRecorder start failed:', error);
+      }
+    }
+    
+    // Fallback to browser speech recognition
     if (!recognitionRef.current) {
       toast.error('Speech recognition not available');
       return;
@@ -277,23 +475,55 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
   };
 
   const stopListening = () => {
+    // Stop OpenAI Whisper recording
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+    
+    // Stop browser speech recognition
     if (recognitionRef.current) {
       recognitionRef.current.stop();
     }
+    
     setIsListening(false);
   };
 
   const toggleSpeech = () => {
     setSpeechEnabled(!speechEnabled);
-    if (speechEnabled && synthRef.current) {
-      synthRef.current.cancel();
+    if (speechEnabled) {
+      // Stop all audio
+      if (synthRef.current) {
+        synthRef.current.cancel();
+      }
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
+      }
       setIsSpeaking(false);
     }
   };
 
-  const sendMessage = (message?: string) => {
+  const handleVoiceMenuClick = (event: React.MouseEvent<HTMLElement>) => {
+    setVoiceMenuAnchor(event.currentTarget);
+    setShowVoiceMenu(true);
+  };
+
+  const handleVoiceMenuClose = () => {
+    setVoiceMenuAnchor(null);
+    setShowVoiceMenu(false);
+  };
+
+  const handleVoiceSelect = (voiceId: string) => {
+    setSelectedVoice(voiceId);
+    handleVoiceMenuClose();
+    toast.success(`Voice changed to ${voiceId}`);
+  };
+
+  const sendMessage = useCallback((message?: string, context?: any) => {
     const messageToSend = message || inputMessage.trim();
+    console.log('ChatInterface: sendMessage called with:', messageToSend, 'context:', context);
     if (!messageToSend) return;
+
 
     // Add user message
     const userMessage: ChatMessage = {
@@ -308,9 +538,20 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
     setMessages(prev => [...prev, userMessage]);
     
     // Send to AI
-    sendMessageMutation.mutate(messageToSend);
+    sendMessageMutation.mutate({ message: messageToSend, context });
     if (!message) setInputMessage(''); // Only clear input if it was typed
-  };
+  }, [inputMessage, sessionId, sendMessageMutation]);
+
+  // Expose sendMessage function to parent - ensure all dependencies are ready
+  useEffect(() => {
+    console.log('ChatInterface: useEffect triggered - onChatReady:', !!onChatReady, 'sessionId:', !!sessionId);
+    if (onChatReady && sessionId) {
+      console.log('ChatInterface: Calling onChatReady with sendMessage function');
+      onChatReady(sendMessage);
+    } else {
+      console.log('ChatInterface: Dependencies not ready yet - onChatReady:', !!onChatReady, 'sessionId:', sessionId);
+    }
+  }, [onChatReady, sessionId, sendMessage]);
 
   const autoCorrectSpeech = (text: string): string => {
     if (!text) return text;
@@ -393,6 +634,57 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
                 {speechEnabled ? <VolumeUp /> : <VolumeOff />}
               </IconButton>
             </Tooltip>
+            
+            {speechEnabled && (
+              <>
+                <Tooltip title="Select voice">
+                  <IconButton onClick={handleVoiceMenuClick} color="primary">
+                    <Settings />
+                  </IconButton>
+                </Tooltip>
+                
+                <Menu
+                  anchorEl={voiceMenuAnchor}
+                  open={showVoiceMenu}
+                  onClose={handleVoiceMenuClose}
+                  PaperProps={{
+                    sx: {
+                      background: 'linear-gradient(135deg, #FFFFFF 0%, #FFF8DC 100%)',
+                      border: '2px solid #FFD93D',
+                      borderRadius: '12px',
+                      mt: 1
+                    }
+                  }}
+                >
+                  {(availableVoices as any)?.voices?.map((voice: any) => (
+                    <MenuItem
+                      key={voice.id}
+                      selected={voice.id === selectedVoice}
+                      onClick={() => handleVoiceSelect(voice.id)}
+                      sx={{
+                        background: voice.id === selectedVoice ? 'linear-gradient(135deg, #FFD93D 0%, #FF8E53 50%)' : 'transparent',
+                        color: voice.id === selectedVoice ? 'white' : '#5D4037',
+                        fontWeight: voice.id === selectedVoice ? 600 : 400,
+                        '&:hover': {
+                          background: voice.id === selectedVoice 
+                            ? 'linear-gradient(135deg, #FFD93D 0%, #FF8E53 50%)' 
+                            : 'linear-gradient(135deg, #FFF8DC 0%, #FFD93D 20%)',
+                        }
+                      }}
+                    >
+                      <Box>
+                        <Typography variant="body2" fontWeight={600}>
+                          {voice.name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {voice.description}
+                        </Typography>
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </Menu>
+              </>
+            )}
           </Box>
         )}
 

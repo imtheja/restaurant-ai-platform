@@ -12,7 +12,7 @@ const api: AxiosInstance = axios.create({
 
 // Create separate AI service instance
 const aiApi: AxiosInstance = axios.create({
-  baseURL: (import.meta.env as any).VITE_AI_SERVICE_URL || 'http://localhost:8002',
+  baseURL: (import.meta.env as any).VITE_AI_SERVICE_URL || 'http://localhost:8003',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -249,6 +249,54 @@ export const chatApi = {
       const response = await aiApi.get(`/api/v1/restaurants/${restaurantSlug}/chat/analytics`, {
         params: { days }
       });
+      return handleApiResponse(response);
+    } catch (error) {
+      handleApiError(error as AxiosError);
+    }
+  },
+
+  // Speech API methods
+  transcribeAudio: async (formData: FormData) => {
+    try {
+      const response = await aiApi.post('/api/v1/speech/transcribe', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return handleApiResponse(response);
+    } catch (error) {
+      handleApiError(error as AxiosError);
+    }
+  },
+
+  synthesizeSpeech: async (data: {
+    text: string;
+    voice?: string;
+    restaurant_slug?: string;
+  }) => {
+    try {
+      const formData = new FormData();
+      formData.append('text', data.text);
+      formData.append('voice', data.voice || 'nova');
+      if (data.restaurant_slug) {
+        formData.append('restaurant_slug', data.restaurant_slug);
+      }
+
+      const response = await aiApi.post('/api/v1/speech/synthesize', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        responseType: 'blob', // Important for audio data
+      });
+      return response; // Return full response for blob data
+    } catch (error) {
+      handleApiError(error as AxiosError);
+    }
+  },
+
+  getAvailableVoices: async () => {
+    try {
+      const response = await aiApi.get('/api/v1/speech/voices');
       return handleApiResponse(response);
     } catch (error) {
       handleApiError(error as AxiosError);

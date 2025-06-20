@@ -26,22 +26,64 @@ const Transition = React.forwardRef(function Transition(
 
 interface FloatingAIAssistantProps {
   restaurantSlug: string;
-  onChatReady?: (sendMessage: (message: string) => void) => void;
+  onChatReady?: (sendMessage: (message: string, context?: any) => void) => void;
+  shouldAutoOpen?: boolean;
+  onOpenChange?: (isOpen: boolean) => void;
 }
 
 const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
   restaurantSlug,
   onChatReady,
+  shouldAutoOpen = false,
+  onOpenChange,
 }) => {
   const [open, setOpen] = useState(false);
+  const [hasInitialized, setHasInitialized] = useState(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-  const handleOpen = () => setOpen(true);
-  const handleClose = () => setOpen(false);
+  const handleOpen = () => {
+    setOpen(true);
+    onOpenChange?.(true);
+  };
+  
+  const handleClose = () => {
+    setOpen(false);
+    onOpenChange?.(false);
+  };
+
+  // Auto-open when shouldAutoOpen changes to true
+  React.useEffect(() => {
+    if (shouldAutoOpen && !open) {
+      handleOpen();
+    }
+  }, [shouldAutoOpen, open]);
+
+  // Initialize chat early
+  React.useEffect(() => {
+    if (!hasInitialized) {
+      setHasInitialized(true);
+    }
+  }, [hasInitialized]);
 
   return (
     <>
+      {/* Hidden ChatInterface for early initialization */}
+      <Box sx={{ display: 'none' }}>
+        <ChatInterface
+          restaurantSlug={restaurantSlug}
+          onChatReady={(sendMessage) => {
+            console.log('FloatingAIAssistant: ChatInterface is ready, forwarding to parent');
+            if (onChatReady) {
+              onChatReady(sendMessage);
+            } else {
+              console.log('FloatingAIAssistant: No onChatReady callback from parent');
+            }
+          }}
+          isEmbedded={true}
+        />
+      </Box>
+
       {/* Floating Action Button */}
       <Fab
         onClick={handleOpen}
@@ -159,7 +201,9 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
           <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             <ChatInterface
               restaurantSlug={restaurantSlug}
-              onChatReady={onChatReady}
+              onChatReady={() => {
+                // This instance is just for display, the hidden one handles the callback
+              }}
               isEmbedded={true}
             />
           </Box>

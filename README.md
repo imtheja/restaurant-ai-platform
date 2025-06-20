@@ -56,7 +56,7 @@ graph TB
     end
     
     subgraph "External Services"
-        AI[OpenAI/Groq API]
+        AI[OpenAI API]
         CDN[CloudFront CDN]
         S3[AWS S3 Storage]
     end
@@ -129,7 +129,7 @@ graph LR
 - **Database**: PostgreSQL 15+ with SQLAlchemy ORM
 - **Cache**: Redis 7+ for session management and caching
 - **Search**: Elasticsearch 8+ for advanced search capabilities
-- **AI/ML**: OpenAI GPT-4, Groq, or local LLM integration
+- **AI/ML**: OpenAI GPT-4 with speech-to-text and text-to-speech
 - **Task Queue**: Celery with Redis broker
 - **Authentication**: JWT with OAuth2 integration
 - **API Documentation**: OpenAPI 3.0 with Swagger UI
@@ -141,7 +141,7 @@ graph LR
 - **State Management**: React Query + Zustand
 - **Routing**: React Router v6
 - **Animations**: Framer Motion
-- **Speech**: Web Speech API (SpeechRecognition & SpeechSynthesis)
+- **Speech**: OpenAI Whisper STT & TTS with Web Speech API fallback
 - **PWA**: Service Workers with Workbox
 
 ### DevOps & Infrastructure
@@ -228,11 +228,9 @@ REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_PASSWORD=your_redis_password
 
-# AI Service Configuration
-AI_PROVIDER=groq  # openai, groq, or grok
-GROQ_API_KEY=your_groq_api_key
+# AI Service Configuration (OpenAI Required)
 OPENAI_API_KEY=your_openai_api_key
-GROK_API_KEY=your_grok_api_key
+OPENAI_MODEL=gpt-4-turbo-preview
 
 # Security
 JWT_SECRET_KEY=your_super_secret_jwt_key

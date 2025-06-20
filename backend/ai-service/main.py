@@ -10,7 +10,7 @@ import logging
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'shared'))
 
 from database.connection import init_database, check_database_health
-from routers import chat, conversations
+from routers import chat, conversations, speech
 from middleware import rate_limiting, request_logging, error_handling
 
 # Configure logging
@@ -78,6 +78,7 @@ app.middleware("http")(error_handling.global_exception_handler)
 # Include routers
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 app.include_router(conversations.router, prefix="/api/v1", tags=["conversations"])
+app.include_router(speech.router, prefix="/api/v1", tags=["speech"])
 
 @app.get("/")
 async def root():

@@ -23,7 +23,8 @@ import { Restaurant } from '../types';
 const RestaurantPage: React.FC = () => {
   const { restaurantSlug } = useParams<{ restaurantSlug: string }>();
   const { setRestaurantTheme } = useThemeStore();
-  const [chatSendMessage, setChatSendMessage] = React.useState<((message: string) => void) | null>(null);
+  const [chatSendMessage, setChatSendMessage] = React.useState<((message: string, context?: any) => void) | null>(null);
+  const [shouldOpenChat, setShouldOpenChat] = React.useState(false);
 
   // Chat is now floating, menu is always shown
 
@@ -113,9 +114,18 @@ const RestaurantPage: React.FC = () => {
           >
             <MenuDisplay 
               restaurantSlug={restaurantSlug!} 
-              onAIChat={(question) => {
+              onAIChat={(question, menuItem, context) => {
+                console.log('RestaurantPage: onAIChat called with question:', question);
+                console.log('RestaurantPage: chatSendMessage state:', chatSendMessage ? 'available' : 'null');
                 if (chatSendMessage) {
-                  chatSendMessage(question);
+                  setShouldOpenChat(true); // Open the chat first
+                  // Send message with a slight delay to ensure chat is open
+                  setTimeout(() => {
+                    console.log('RestaurantPage: Calling chatSendMessage with question and context:', question, context);
+                    chatSendMessage(question, context);
+                  }, 300);
+                } else {
+                  console.warn('RestaurantPage: chatSendMessage is not ready, AI functionality may not work yet');
                 }
               }}
             />
@@ -125,7 +135,15 @@ const RestaurantPage: React.FC = () => {
         {/* Floating AI Assistant */}
         <FloatingAIAssistant
           restaurantSlug={restaurantSlug!}
-          onChatReady={(sendMessage) => setChatSendMessage(() => sendMessage)}
+          shouldAutoOpen={shouldOpenChat}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) setShouldOpenChat(false);
+          }}
+          onChatReady={(sendMessage) => {
+            console.log('RestaurantPage: onChatReady called with sendMessage:', typeof sendMessage);
+            setChatSendMessage(() => sendMessage);
+            console.log('RestaurantPage: Chat is ready, sendMessage function set');
+          }}
         />
       </Container>
     </motion.div>

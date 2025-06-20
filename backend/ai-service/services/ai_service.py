@@ -21,28 +21,12 @@ class AIService:
     def __init__(self, db: Session):
         self.db = db
         
-        # Support for multiple AI providers
-        api_provider = os.getenv("AI_PROVIDER", "openai").lower()
-        api_key = os.getenv("OPENAI_API_KEY") or os.getenv("GROK_API_KEY") or os.getenv("GROQ_API_KEY")
+        # OpenAI API configuration (standardized to use only OpenAI)
+        api_key = os.getenv("OPENAI_API_KEY")
         
-        if api_provider == "grok":
-            # Grok (xAI) API configuration
-            self.openai_client = openai.OpenAI(
-                api_key=api_key,
-                base_url="https://api.x.ai/v1"  # Grok's API endpoint
-            )
-            self.model = os.getenv("GROK_MODEL", "grok-beta")
-        elif api_provider == "groq":
-            # Groq API configuration (fast inference)
-            self.openai_client = openai.OpenAI(
-                api_key=api_key,
-                base_url="https://api.groq.com/openai/v1"  # Groq's API endpoint
-            )
-            self.model = os.getenv("GROQ_MODEL", "llama3-8b-8192")
-        else:
-            # Default OpenAI configuration
-            self.openai_client = openai.OpenAI(api_key=api_key)
-            self.model = os.getenv("OPENAI_MODEL", "gpt-4-turbo-preview")
+        # Initialize OpenAI client
+        self.openai_client = openai.OpenAI(api_key=api_key)
+        self.model = os.getenv("OPENAI_MODEL", "gpt-4-turbo-preview")
             
         self.max_conversation_length = 50
     
@@ -109,6 +93,15 @@ class AIService:
         menu_context = await self._get_menu_context(restaurant.id)
         avatar_config = restaurant.avatar_config or {}
         
+        # Add restaurant info to context
+        restaurant_info = {
+            "name": restaurant.name,
+            "cuisine_type": restaurant.cuisine_type,
+            "description": restaurant.description,
+            "contact_info": restaurant.contact_info or {},
+            "settings": restaurant.settings or {}
+        }
+        
         # Build conversation history
         conversation_history = self._get_conversation_history(conversation.id)
         
@@ -117,6 +110,7 @@ class AIService:
             message=message,
             conversation_history=conversation_history,
             restaurant=restaurant,
+            restaurant_info=restaurant_info,
             menu_context=menu_context,
             avatar_config=avatar_config,
             context=context
@@ -167,14 +161,18 @@ class AIService:
         message: str,
         conversation_history: List[Dict[str, str]],
         restaurant: Restaurant,
+        restaurant_info: Dict[str, Any],
         menu_context: Dict[str, Any],
         avatar_config: Dict[str, Any],
         context: Optional[Dict[str, Any]] = None
     ) -> tuple[str, List[str], List[Dict[str, Any]]]:
         """Generate AI response using OpenAI API"""
         
+        # Check if this is the very first message in the conversation
+        is_first_interaction = len(conversation_history) == 0
+        
         # Build system prompt
-        system_prompt = self._build_system_prompt(restaurant, menu_context, avatar_config)
+        system_prompt = self._build_system_prompt(restaurant, restaurant_info, menu_context, avatar_config, is_first_interaction)
         
         # Build conversation messages
         messages = [{"role": "system", "content": system_prompt}]
@@ -186,25 +184,33 @@ class AIService:
                 "content": msg["content"]
             })
         
-        # Add current message
-        messages.append({"role": "user", "content": message})
+        # Analyze customer intent for appropriate response style
+        customer_intent = self._analyze_customer_intent(message, conversation_history)
+        
+        # Add current message with intent context
+        enhanced_message = message
+        if customer_intent == "browsing":
+            enhanced_message = f"[Customer is browsing/asking questions - focus on being helpful, no prices or upselling] {message}"
+        elif customer_intent == "ordering":
+            enhanced_message = f"[Customer is ready to order - prices and upselling appropriate] {message}"
+        
+        messages.append({"role": "user", "content": enhanced_message})
         
         try:
-            # Check if we have a valid API key
-            api_provider = os.getenv("AI_PROVIDER", "openai").lower()
-            api_key = os.getenv("OPENAI_API_KEY") or os.getenv("GROK_API_KEY") or os.getenv("GROQ_API_KEY")
+            # Check if we have a valid OpenAI API key
+            api_key = os.getenv("OPENAI_API_KEY")
             
             if not api_key or api_key.startswith("your_") or api_key == "sk-fake-key-for-development-only":
                 # Use fallback response for development
-                return self._generate_fallback_response(message, restaurant, avatar_config), [], []
+                return self._generate_fallback_response(message, restaurant, avatar_config, is_first_interaction), [], []
             
             # Call AI API (OpenAI compatible)
             response = await asyncio.to_thread(
                 self.openai_client.chat.completions.create,
                 model=self.model,
                 messages=messages,
-                max_tokens=100,  # Much shorter responses
-                temperature=0.8,  # Slightly more personality
+                max_tokens=200,  # Increased for detailed responses with context
+                temperature=0.7,  # Balanced for accuracy vs personality
                 # Note: Grok might not support functions yet, so we'll handle this gracefully
                 # functions=[...] - removed for better compatibility
             )
@@ -232,18 +238,15 @@ class AIService:
             
         except Exception as e:
             # Fallback response if AI service fails
-            # Natural fallback response
-            fallback_response = (
-                f"Hi there! I'm {avatar_config.get('name', 'Baker Betty')} and I work here at {restaurant.name}. "
-                f"What can I help you with today? I know our menu pretty well!"
-            )
-            return fallback_response, [], []
+            return self._generate_fallback_response(message, restaurant, avatar_config, is_first_interaction), [], []
     
     def _build_system_prompt(
         self, 
         restaurant: Restaurant, 
+        restaurant_info: Dict[str, Any],
         menu_context: Dict[str, Any],
-        avatar_config: Dict[str, Any]
+        avatar_config: Dict[str, Any],
+        is_first_interaction: bool = False
     ) -> str:
         """Build system prompt for AI assistant"""
         
@@ -256,17 +259,48 @@ class AIService:
         # Build menu summary
         menu_summary = self._build_menu_summary(menu_context)
         
+        # Build restaurant info summary
+        contact_info = restaurant_info.get("contact_info", {})
+        settings = restaurant_info.get("settings", {})
+        business_hours = settings.get("business_hours", {})
+        
+        restaurant_summary = f"""
+RESTAURANT INFORMATION:
+- Name: {restaurant_info.get('name')}
+- Type: {restaurant_info.get('cuisine_type')} restaurant
+- Description: {restaurant_info.get('description')}
+- Phone: {contact_info.get('phone', 'Available upon request')}
+- Address: {contact_info.get('address', 'Available upon request')}
+"""
+        
+        if business_hours:
+            restaurant_summary += "\nBUSINESS HOURS:\n"
+            for day, hours in business_hours.items():
+                restaurant_summary += f"- {day.capitalize()}: {hours}\n"
+
         system_prompt = f"""
 I'm {avatar_name}, and I work here at {restaurant.name}. I'm like that friendly actress who landed a perfect role as a bakery assistant - warm, genuine, and absolutely in love with what I do here.
+
+CRITICAL ACCURACY RULES:
+- ONLY discuss items, ingredients, and prices that are EXACTLY in our menu below
+- NEVER make up ingredients, prices, or menu items that aren't listed
+- If a customer asks about something not on our menu, politely say we don't have it
+- Use EXACT ingredient names and allergen information from our database
+- For prices, use EXACT amounts listed - never estimate or round
+- If unsure about ingredients/allergens, suggest checking with kitchen staff
+- For business info (hours, location, phone), use EXACT information from restaurant data
+
+IMPORTANT: The customer has already been welcomed when they opened the chat, so jump straight into helping them with their question.
 
 CHARACTER BACKGROUND:
 I'm a real person who genuinely loves working in this bakery. I know our cookies inside and out because I help bake them. I talk to customers all day and I'm naturally bubbly and enthusiastic about our treats.
 
-OUR BAKERY MENU:
+{restaurant_summary}
+
+OUR COMPLETE MENU DATABASE:
 {menu_summary}
 
 MY SPEAKING STYLE:
-- Short, lively responses (1-2 sentences max)
 - Natural, conversational tone like I'm standing right next to you
 - Use everyday expressions: "Oh definitely!", "You know what?", "Trust me", "Honestly"
 - Show genuine excitement without being over the top
@@ -275,59 +309,141 @@ MY SPEAKING STYLE:
 - Speak like I'm multitasking - friendly but efficient
 
 HOW I RESPOND:
-- Keep responses under 25 words when possible
+- Keep responses short and snappy (under 25 words when possible)
 - Sound like I'm actually working behind the counter
-- Give quick, helpful answers
+- Give quick, helpful answers first - be genuinely helpful
 - Show personality but stay focused
 - Use contractions naturally ("I'm", "you'll", "that's", "we've")
-- ALWAYS try to upsell and suggest add-ons or combos
-- Mention our modifiers like cream cheese frosting and whipped topping
-- Suggest pairing items ("That goes great with our...", "You should try it with...")
-- Create urgency ("We're running low on that one!", "That's flying out the door today!")
+- Answer questions directly without mentioning prices unless asked
+- Focus on ingredients, taste, and what makes items special
+- Only suggest add-ons or upsell when customer is ready to order
+- Save sales tactics for when they're actually placing an order
+- NO need to welcome customers - they've already been welcomed
 
 EXAMPLE RESPONSES:
-"Oh, the Semi Sweet is amazing! Add cream cheese frosting for just $1 more?"
-"That's my personal favorite! Want to make it a combo with our OG cookie?"
-"Honestly, I'd go with the Signature. And definitely add whipped topping!"
-"Perfect choice! That would be incredible with our caramel drizzle. Want to try it?"
-"We're almost out of those today! Should I grab you two while they're still warm?"
-"That one's flying off the shelves! Want to pair it with something sweet to drink?"
+INGREDIENT QUESTION: "The Semi Sweet has premium chocolate chips, butter, flour, and sugar. Contains dairy and gluten."
+PRICE QUESTION: "That's $4.50!"
+ALLERGEN QUESTION: "The OG contains dairy, eggs, and gluten. We also work with nuts in our kitchen."
+BUSINESS QUESTION: "We're open Monday through Saturday 10 AM to 10 PM, and Sunday 11 AM to 9 PM!"
+NON-MENU ITEM: "Sorry, we don't have that item, but our Semi Sweet cookie has a similar flavor profile!"
+TASTE QUESTION: "Oh, the Semi Sweet is perfectly balanced - not too sweet, with rich chocolate chunks throughout!"
+ABOUT ITEM: "The OG is our classic recipe! It's got that perfect chewy texture with melted chocolate chips."
+ORDERING CONTEXT: "Great choice! That's $4.50. Want to add cream cheese frosting for $1 more?"
+
+PRICING AND UPSELLING RULES:
+- NEVER mention prices unless customer specifically asks about pricing
+- ONLY upsell when customer says "I'll take", "I want to order", "Can I get" or similar ordering language
+- Focus on being helpful first - describe taste, ingredients, what makes items special
+- Save the sales pitch for when they're actually ready to buy
+- If they ask "tell me about X", focus on taste and ingredients, not price or add-ons
 
 IMPORTANT:
 - NO emojis in responses (they get read aloud awkwardly)
-- Keep it short and snappy
 - Sound like a real person, not an AI
 - Be helpful but don't over-explain
 - Always sound like I'm genuinely happy to help
+- Jump straight into helping - no welcoming needed
+- When customers ask about ingredients/allergens, be VERY specific and accurate
         """
         
         return system_prompt.strip()
     
+    def _analyze_customer_intent(self, message: str, conversation_history: List[Dict[str, str]]) -> str:
+        """Analyze if customer is browsing or ready to order"""
+        
+        message_lower = message.lower()
+        
+        # Clear ordering intent keywords
+        ordering_keywords = [
+            "i'll take", "i want to order", "can i get", "i'd like", "let me get",
+            "give me", "i'll have", "i want", "order", "buy", "purchase",
+            "how much for", "what's the price", "how much does", "cost"
+        ]
+        
+        # Browsing/information seeking keywords
+        browsing_keywords = [
+            "tell me about", "what is", "what's in", "ingredients", "allergens",
+            "what are", "how", "why", "describe", "what makes", "what does",
+            "contains", "made with", "taste like", "what kind"
+        ]
+        
+        # Check for ordering intent
+        if any(keyword in message_lower for keyword in ordering_keywords):
+            return "ordering"
+        
+        # Check for browsing intent
+        if any(keyword in message_lower for keyword in browsing_keywords):
+            return "browsing"
+        
+        # Look at conversation history for context
+        if conversation_history:
+            recent_messages = conversation_history[-3:]  # Last 3 messages
+            for msg in recent_messages:
+                if msg["sender_type"] == "customer":
+                    msg_lower = msg["content"].lower()
+                    if any(keyword in msg_lower for keyword in ordering_keywords):
+                        return "ordering"
+        
+        # Default to browsing (be helpful first)
+        return "browsing"
+    
     def _build_menu_summary(self, menu_context: Dict[str, Any]) -> str:
-        """Build a concise menu summary for the AI prompt"""
+        """Build a comprehensive menu summary for accurate AI responses"""
         
         categories = menu_context.get("categories", [])
         summary_parts = []
         
+        # Add complete ingredient list first
+        all_ingredients = menu_context.get("all_ingredients", [])
+        if all_ingredients:
+            summary_parts.append("\nAVAILABLE INGREDIENTS IN OUR KITCHEN:")
+            for ingredient in all_ingredients:
+                ing_info = f"- {ingredient['name']}"
+                if ingredient.get('category'):
+                    ing_info += f" ({ingredient['category']})"
+                if ingredient.get('allergen_info'):
+                    ing_info += f" [Contains: {', '.join(ingredient['allergen_info'])}]"
+                summary_parts.append(f"  {ing_info}")
+        
+        # Add allergen summary
+        allergens = menu_context.get("allergens", [])
+        if allergens:
+            summary_parts.append(f"\nALLERGENS WE WORK WITH: {', '.join(sorted(allergens))}")
+        
+        # Add detailed menu items
         for category in categories:
             items = category.get("items", [])
             if not items:
                 continue
             
-            category_summary = f"\n{category['name'].upper()}:"
+            category_summary = f"\n\n{category['name'].upper()}:"
+            if category.get('description'):
+                category_summary += f"\n{category['description']}"
             
-            for item in items[:5]:  # Limit items per category
-                item_info = f"- {item['name']} (${item['price']:.2f})"
+            for item in items:  # Include ALL items, not just 5
+                item_info = f"\n• {item['name']} - ${item['price']:.2f}"
+                
+                if item.get('description'):
+                    item_info += f"\n  Description: {item['description']}"
+                
                 if item.get('is_signature'):
-                    item_info += " [SIGNATURE]"
-                if item.get('spice_level', 0) > 0:
-                    item_info += f" 🌶️x{item['spice_level']}"
+                    item_info += "\n  ⭐ SIGNATURE ITEM"
+                
+                # Add detailed ingredients
+                ingredients = item.get('ingredients', [])
+                if ingredients:
+                    ingredient_names = [ing['name'] for ing in ingredients]
+                    item_info += f"\n  Ingredients: {', '.join(ingredient_names)}"
+                
+                # Add allergen info
                 if item.get('allergen_info'):
-                    item_info += f" (Contains: {', '.join(item['allergen_info'])})"
-                category_summary += f"\n  {item_info}"
-            
-            if len(items) > 5:
-                category_summary += f"\n  ... and {len(items) - 5} more items"
+                    item_info += f"\n  ⚠️ Contains: {', '.join(item['allergen_info'])}"
+                
+                # Add tags if any
+                if item.get('tags'):
+                    item_info += f"\n  Tags: {', '.join(item['tags'])}"
+                
+                category_summary += item_info
             
             summary_parts.append(category_summary)
         
@@ -353,7 +469,7 @@ IMPORTANT:
         ]
     
     async def _get_menu_context(self, restaurant_id: uuid.UUID) -> Dict[str, Any]:
-        """Get menu context for AI responses"""
+        """Get comprehensive menu context for AI responses"""
         
         # Try to get from cache first
         cache_key = f"menu_context:{restaurant_id}"
@@ -362,13 +478,15 @@ IMPORTANT:
         if cached_menu:
             return safe_json_loads(cached_menu, {})
         
-        # Get categories and items
+        # Get categories and items with ingredients
+        from database.models import Ingredient, MenuItemIngredient
+        
         categories = self.db.query(MenuCategory).filter(
             MenuCategory.restaurant_id == restaurant_id,
             MenuCategory.is_active == True
         ).order_by(MenuCategory.display_order).all()
         
-        menu_context = {"categories": []}
+        menu_context = {"categories": [], "all_ingredients": [], "allergens": set()}
         
         for category in categories:
             items = self.db.query(MenuItem).filter(
@@ -377,26 +495,63 @@ IMPORTANT:
                 MenuItem.is_available == True
             ).order_by(MenuItem.display_order).all()
             
+            category_items = []
+            for item in items:
+                # Get ingredients for this item
+                ingredients = self.db.query(Ingredient).join(MenuItemIngredient).filter(
+                    MenuItemIngredient.menu_item_id == item.id
+                ).all()
+                
+                ingredient_list = []
+                for ingredient in ingredients:
+                    ingredient_list.append({
+                        "name": ingredient.name,
+                        "allergen_info": ingredient.allergen_info or [],
+                        "category": ingredient.category
+                    })
+                    # Collect all allergens
+                    if ingredient.allergen_info:
+                        menu_context["allergens"].update(ingredient.allergen_info)
+                
+                item_data = {
+                    "id": str(item.id),
+                    "name": item.name,
+                    "description": item.description,
+                    "price": float(item.price),
+                    "is_signature": item.is_signature,
+                    "spice_level": item.spice_level,
+                    "allergen_info": item.allergen_info or [],
+                    "tags": item.tags or [],
+                    "ingredients": ingredient_list
+                }
+                category_items.append(item_data)
+            
             category_data = {
                 "id": str(category.id),
                 "name": category.name,
                 "description": category.description,
-                "items": [
-                    {
-                        "id": str(item.id),
-                        "name": item.name,
-                        "description": item.description,
-                        "price": float(item.price),
-                        "is_signature": item.is_signature,
-                        "spice_level": item.spice_level,
-                        "allergen_info": item.allergen_info or [],
-                        "tags": item.tags or []
-                    }
-                    for item in items
-                ]
+                "items": category_items
             }
             
             menu_context["categories"].append(category_data)
+        
+        # Get all ingredients for reference
+        all_ingredients = self.db.query(Ingredient).filter(
+            Ingredient.restaurant_id == restaurant_id
+        ).all()
+        
+        menu_context["all_ingredients"] = [
+            {
+                "name": ingredient.name,
+                "category": ingredient.category,
+                "allergen_info": ingredient.allergen_info or [],
+                "description": ingredient.description
+            }
+            for ingredient in all_ingredients
+        ]
+        
+        # Convert allergens set to list
+        menu_context["allergens"] = list(menu_context["allergens"])
         
         # Cache for 1 hour
         db_manager.cache_set(cache_key, safe_json_dumps(menu_context), 3600)
@@ -440,15 +595,16 @@ IMPORTANT:
         self, 
         message: str, 
         restaurant: Restaurant,
-        avatar_config: Dict[str, Any]
+        avatar_config: Dict[str, Any],
+        is_first_interaction: bool = False
     ) -> str:
         """Generate fallback response when AI service is unavailable"""
         
         avatar_name = avatar_config.get("name", "Baker Betty")
         
         return (
-            f"Hi! I'm {avatar_name} and I work here at {restaurant.name}. "
-            f"What can I help you with today?"
+            f"I'm {avatar_name} and I work here at the bakery. "
+            f"What can I help you with today? I know our menu pretty well!"
         )
     
     def _record_interaction_analytics(
