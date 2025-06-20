@@ -12,7 +12,7 @@ import os
 # Add shared module to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'shared'))
 
-from database.models import Restaurant, Conversation, Message, MenuItem, MenuCategory, InteractionAnalytics
+from database.models import Restaurant, Conversation, Message, MenuItem, MenuCategory, InteractionAnalytics, Ingredient, MenuItemIngredient
 from database.connection import db_manager
 from schemas import ChatResponse
 from utils import generate_session_id, extract_keywords, safe_json_loads, safe_json_dumps
@@ -479,7 +479,6 @@ IMPORTANT:
             return safe_json_loads(cached_menu, {})
         
         # Get categories and items with ingredients
-        from database.models import Ingredient, MenuItemIngredient
         
         categories = self.db.query(MenuCategory).filter(
             MenuCategory.restaurant_id == restaurant_id,
@@ -535,17 +534,16 @@ IMPORTANT:
             
             menu_context["categories"].append(category_data)
         
-        # Get all ingredients for reference
+        # Get all ingredients for reference (ingredients are shared across restaurants)
         all_ingredients = self.db.query(Ingredient).filter(
-            Ingredient.restaurant_id == restaurant_id
+            Ingredient.is_active == True
         ).all()
         
         menu_context["all_ingredients"] = [
             {
                 "name": ingredient.name,
                 "category": ingredient.category,
-                "allergen_info": ingredient.allergen_info or [],
-                "description": ingredient.description
+                "allergen_info": ingredient.allergen_info or []
             }
             for ingredient in all_ingredients
         ]
