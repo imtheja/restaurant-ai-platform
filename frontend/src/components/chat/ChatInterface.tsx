@@ -308,8 +308,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
       
       const response = await chatApi.transcribeAudio(formData);
       
-      if (response.data?.transcript) {
-        const transcript = autoCorrectSpeech(response.data.transcript.trim());
+      if (response?.transcript) {
+        const transcript = autoCorrectSpeech(response.transcript.trim());
         setInputMessage(transcript);
         
         // Auto-send the message
@@ -386,6 +386,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
         voice: selectedVoice,
         restaurant_slug: restaurantSlug
       });
+      
+      if (!response || !response.data) {
+        throw new Error('No audio data received from server');
+      }
       
       // Stop any current audio
       if (currentAudioRef.current) {

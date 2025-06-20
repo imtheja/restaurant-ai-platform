@@ -256,7 +256,7 @@ export const chatApi = {
   },
 
   // Speech API methods
-  transcribeAudio: async (formData: FormData) => {
+  transcribeAudio: async (formData: FormData): Promise<{ transcript: string }> => {
     try {
       const response = await aiApi.post('/api/v1/speech/transcribe', formData, {
         headers: {
@@ -265,7 +265,7 @@ export const chatApi = {
       });
       return handleApiResponse(response);
     } catch (error) {
-      handleApiError(error as AxiosError);
+      return handleApiError(error as AxiosError);
     }
   },
 
@@ -273,7 +273,7 @@ export const chatApi = {
     text: string;
     voice?: string;
     restaurant_slug?: string;
-  }) => {
+  }): Promise<AxiosResponse<Blob>> => {
     try {
       const formData = new FormData();
       formData.append('text', data.text);
@@ -290,7 +290,7 @@ export const chatApi = {
       });
       return response; // Return full response for blob data
     } catch (error) {
-      handleApiError(error as AxiosError);
+      return handleApiError(error as AxiosError);
     }
   },
 
