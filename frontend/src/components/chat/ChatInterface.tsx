@@ -38,7 +38,7 @@ import toast from 'react-hot-toast';
 import { chatApi, restaurantApi } from '@services/api';
 
 // Types
-import { Message, AvatarConfig, ChatMessage } from '../../types';
+import { Message, AvatarConfig, ChatMessage, VoicesResponse, Voice } from '../../types';
 
 interface ChatInterfaceProps {
   restaurantSlug: string;
@@ -110,9 +110,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
   );
 
   // Get available voices
-  const { data: availableVoices } = useQuery(
+  const { data: availableVoices, error: voicesError, isLoading: voicesLoading } = useQuery<VoicesResponse, Error>(
     ['voices'],
-    () => chatApi.getAvailableVoices(),
+    () => chatApi.getAvailableVoices() as Promise<VoicesResponse>,
     {
       staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     }
@@ -422,7 +422,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
     } catch (error) {
       console.error('OpenAI speech synthesis failed:', error);
       setIsSpeaking(false);
-      // Fallback to browser speech synthesis only if OpenAI completely fails
+      
+      // Check if it's a rate limiting error
+      if (error instanceof Error && (error.message.includes('429') || error.message.toLowerCase().includes('rate limit'))) {
+        toast.error('Speech synthesis is temporarily busy. Please try again in a few moments.');
+        return; // Don't fallback to browser speech for rate limiting
+      }
+      
+      // Fallback to browser speech synthesis for other errors
       speakText(text);
     }
   };
@@ -660,32 +667,44 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
                     }
                   }}
                 >
-                  {(availableVoices as any)?.voices?.map((voice: any) => (
-                    <MenuItem
-                      key={voice.id}
-                      selected={voice.id === selectedVoice}
-                      onClick={() => handleVoiceSelect(voice.id)}
-                      sx={{
-                        background: voice.id === selectedVoice ? 'linear-gradient(135deg, #FFD93D 0%, #FF8E53 50%)' : 'transparent',
-                        color: voice.id === selectedVoice ? 'white' : '#5D4037',
-                        fontWeight: voice.id === selectedVoice ? 600 : 400,
-                        '&:hover': {
-                          background: voice.id === selectedVoice 
-                            ? 'linear-gradient(135deg, #FFD93D 0%, #FF8E53 50%)' 
-                            : 'linear-gradient(135deg, #FFF8DC 0%, #FFD93D 20%)',
-                        }
-                      }}
-                    >
-                      <Box>
-                        <Typography variant="body2" fontWeight={600}>
-                          {voice.name}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {voice.description}
-                        </Typography>
-                      </Box>
-                    </MenuItem>
-                  ))}
+                  {voicesLoading && (
+                    <MenuItem disabled>Loading voices...</MenuItem>
+                  )}
+                  {voicesError && (
+                    <MenuItem disabled>Error loading voices</MenuItem>
+                  )}
+                  {availableVoices?.voices && !voicesLoading && !voicesError ? (
+                    (availableVoices as VoicesResponse).voices.map((voice: Voice) => (
+                      <MenuItem
+                        key={voice.id}
+                        selected={voice.id === selectedVoice}
+                        onClick={() => handleVoiceSelect(voice.id)}
+                        sx={{
+                          background: voice.id === selectedVoice ? 'linear-gradient(135deg, #FFD93D 0%, #FF8E53 50%)' : 'transparent',
+                          color: voice.id === selectedVoice ? 'white' : '#5D4037',
+                          fontWeight: voice.id === selectedVoice ? 600 : 400,
+                          '&:hover': {
+                            background: voice.id === selectedVoice 
+                              ? 'linear-gradient(135deg, #FFD93D 0%, #FF8E53 50%)' 
+                              : 'linear-gradient(135deg, #FFF8DC 0%, #FFD93D 20%)',
+                          }
+                        }}
+                      >
+                        <Box>
+                          <Typography variant="body2" fontWeight={600}>
+                            {voice.name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {voice.description}
+                          </Typography>
+                        </Box>
+                      </MenuItem>
+                    ))
+                  ) : (
+                    !voicesLoading && !voicesError && (
+                      <MenuItem disabled>No voices available</MenuItem>
+                    )
+                  )}
                 </Menu>
               </>
             )}

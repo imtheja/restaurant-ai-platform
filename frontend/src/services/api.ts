@@ -214,7 +214,7 @@ export const chatApi = {
     context?: Record<string, any>;
   }) => {
     try {
-      const response = await aiApi.post(`/api/v1/restaurants/${restaurantSlug}/chat`, data);
+      const response = await api.post(`/api/v1/restaurants/${restaurantSlug}/chat`, data);
       return handleApiResponse(response);
     } catch (error) {
       handleApiError(error as AxiosError);
@@ -224,7 +224,7 @@ export const chatApi = {
   // Get conversation suggestions
   getSuggestions: async (restaurantSlug: string, context?: string) => {
     try {
-      const response = await aiApi.get(`/api/v1/restaurants/${restaurantSlug}/chat/suggestions`, {
+      const response = await api.get(`/api/v1/restaurants/${restaurantSlug}/chat/suggestions`, {
         params: { context }
       });
       return handleApiResponse(response);
@@ -236,7 +236,7 @@ export const chatApi = {
   // Submit feedback
   submitFeedback: async (restaurantSlug: string, feedbackData: Record<string, any>) => {
     try {
-      const response = await aiApi.post(`/api/v1/restaurants/${restaurantSlug}/chat/feedback`, feedbackData);
+      const response = await api.post(`/api/v1/restaurants/${restaurantSlug}/chat/feedback`, feedbackData);
       return handleApiResponse(response);
     } catch (error) {
       handleApiError(error as AxiosError);
@@ -246,7 +246,7 @@ export const chatApi = {
   // Get chat analytics
   getAnalytics: async (restaurantSlug: string, days: number = 7) => {
     try {
-      const response = await aiApi.get(`/api/v1/restaurants/${restaurantSlug}/chat/analytics`, {
+      const response = await api.get(`/api/v1/restaurants/${restaurantSlug}/chat/analytics`, {
         params: { days }
       });
       return handleApiResponse(response);
@@ -258,7 +258,7 @@ export const chatApi = {
   // Speech API methods
   transcribeAudio: async (formData: FormData): Promise<{ transcript: string }> => {
     try {
-      const response = await aiApi.post('/api/v1/speech/transcribe', formData, {
+      const response = await api.post('/api/v1/speech/transcribe', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -282,7 +282,7 @@ export const chatApi = {
         formData.append('restaurant_slug', data.restaurant_slug);
       }
 
-      const response = await aiApi.post('/api/v1/speech/synthesize', formData, {
+      const response = await api.post('/api/v1/speech/synthesize', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -296,7 +296,31 @@ export const chatApi = {
 
   getAvailableVoices: async () => {
     try {
-      const response = await aiApi.get('/api/v1/speech/voices');
+      const response = await api.get('/api/v1/speech/voices');
+      return handleApiResponse(response);
+    } catch (error) {
+      handleApiError(error as AxiosError);
+    }
+  },
+};
+
+// Menu Image API
+export const menuImageApi = {
+  // Upload image for menu item
+  uploadImage: async (restaurantId: string, itemId: string, file: File) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await api.post(
+        `/api/v1/restaurants/${restaurantId}/menu/items/${itemId}/image`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
       return handleApiResponse(response);
     } catch (error) {
       handleApiError(error as AxiosError);

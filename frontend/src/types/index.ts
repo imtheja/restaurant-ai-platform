@@ -267,3 +267,16 @@ export interface MenuEvent {
   type: 'item_view' | 'category_change' | 'search' | 'filter_change';
   data: any;
 }
+
+// Voice/Speech Types
+export interface Voice {
+  id: string;
+  name: string;
+  description: string;
+  gender: 'male' | 'female' | 'neutral';
+  recommended_for: string;
+}
+
+export interface VoicesResponse {
+  voices: Voice[];
+}

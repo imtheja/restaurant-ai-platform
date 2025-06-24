@@ -96,6 +96,23 @@ class SpeechService:
             return response.content
             
         except Exception as e:
+            error_message = str(e)
+            
+            # Handle rate limiting specifically
+            if "429" in error_message or "rate limit" in error_message.lower():
+                raise HTTPException(
+                    status_code=429, 
+                    detail="Speech synthesis rate limit exceeded. Please try again in a few moments."
+                )
+            
+            # Handle other OpenAI API errors
+            if "401" in error_message or "unauthorized" in error_message.lower():
+                raise HTTPException(
+                    status_code=503, 
+                    detail="Speech synthesis service temporarily unavailable."
+                )
+                
+            # Generic error fallback
             raise HTTPException(status_code=500, detail=f"Speech generation failed: {str(e)}")
 
 @router.post("/speech/transcribe")
@@ -153,6 +170,11 @@ async def synthesize_speech(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+@router.options("/speech/voices")
+async def options_available_voices():
+    """Handle preflight CORS requests for voices endpoint"""
+    return {}
 
 @router.get("/speech/voices")
 async def get_available_voices():
