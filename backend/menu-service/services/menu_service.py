@@ -1,8 +1,12 @@
 """Menu service business logic."""
+import os
+import uuid as uuid_lib
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
+from PIL import Image
+import io
 from database.models import (
     MenuItem, MenuCategory, Restaurant,
     Ingredient, MenuItemIngredient
@@ -219,3 +223,85 @@ class MenuService:
                 ).exists()
             )
         ).offset(skip).limit(limit).all()
+
+    @staticmethod
+    async def upload_menu_item_image(
+        db: Session,
+        restaurant_id: UUID,
+        item_id: UUID,
+        filename: str,
+        content: bytes
+    ) -> Optional[str]:
+        """Upload and process an image for a menu item."""
+        # Verify menu item exists and belongs to restaurant
+        db_item = db.query(MenuItem).join(MenuCategory).filter(
+            MenuItem.id == item_id,
+            MenuCategory.restaurant_id == restaurant_id
+        ).first()
+        
+        if not db_item:
+            return None
+        
+        try:
+            # Create uploads directory if it doesn't exist
+            upload_dir = os.path.join(os.getcwd(), "uploads", "menu-items")
+            os.makedirs(upload_dir, exist_ok=True)
+            
+            # Generate unique filename
+            file_extension = filename.split('.')[-1].lower() if '.' in filename else 'jpg'
+            unique_filename = f"{item_id}_{uuid_lib.uuid4().hex[:8]}.{file_extension}"
+            file_path = os.path.join(upload_dir, unique_filename)
+            
+            # Process and optimize image using PIL
+            image = Image.open(io.BytesIO(content))
+            
+            # Convert to RGB if necessary (for JPEG support)
+            if image.mode in ('RGBA', 'LA', 'P'):
+                image = image.convert('RGB')
+            
+            # Create multiple sizes
+            sizes = {
+                'thumbnail': (150, 150),
+                'card': (300, 300),
+                'full': (800, 800)
+            }
+            
+            saved_files = {}
+            for size_name, (width, height) in sizes.items():
+                # Calculate aspect ratio preserving resize
+                image_copy = image.copy()
+                image_copy.thumbnail((width, height), Image.Resampling.LANCZOS)
+                
+                # Create filename for this size
+                size_filename = f"{item_id}_{uuid_lib.uuid4().hex[:8]}_{size_name}.jpg"
+                size_path = os.path.join(upload_dir, size_filename)
+                
+                # Save optimized image
+                image_copy.save(size_path, 'JPEG', quality=85, optimize=True)
+                
+                # Store relative URL for serving
+                saved_files[size_name] = f"/uploads/menu-items/{size_filename}"
+            
+            # Update menu item with primary image URL (card size)
+            db_item.image_url = saved_files['card']
+            db.commit()
+            db.refresh(db_item)
+            
+            return saved_files['card']
+            
+        except Exception as e:
+            # If image processing fails, save original file
+            try:
+                with open(file_path, 'wb') as f:
+                    f.write(content)
+                
+                # Update menu item with basic URL
+                relative_url = f"/uploads/menu-items/{unique_filename}"
+                db_item.image_url = relative_url
+                db.commit()
+                db.refresh(db_item)
+                
+                return relative_url
+                
+            except Exception:
+                return None

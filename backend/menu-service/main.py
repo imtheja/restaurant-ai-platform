@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import os
 import sys
@@ -70,6 +71,11 @@ app.middleware("http")(error_handling.global_exception_handler)
 # Include routers
 app.include_router(menu.router, prefix="/api/v1", tags=["menu"])
 app.include_router(ingredients.router, prefix="/api/v1", tags=["ingredients"])
+
+# Serve static files for uploaded images
+uploads_dir = os.path.join(os.getcwd(), "uploads")
+os.makedirs(uploads_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 @app.get("/")
 async def root():

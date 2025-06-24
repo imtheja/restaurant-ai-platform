@@ -4,6 +4,7 @@ import {
   Typography, 
   Card, 
   CardContent, 
+  CardMedia,
   Grid, 
   Chip,
   Container,
@@ -145,6 +146,28 @@ const MenuDisplay: React.FC<MenuDisplayProps> = ({ restaurantSlug, onAIChat }) =
                     }
                   }}
                 >
+                  {/* Menu Item Image */}
+                  {item.image_url && (
+                    <CardMedia
+                      component="img"
+                      height="200"
+                      image={item.image_url.startsWith('http') ? item.image_url : `${(import.meta.env as any).VITE_MENU_SERVICE_URL || 'http://localhost:8002'}${item.image_url}`}
+                      alt={item.name}
+                      sx={{
+                        objectFit: 'cover',
+                        borderRadius: '12px 12px 0 0',
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          transform: 'scale(1.05)',
+                        }
+                      }}
+                      onError={(e) => {
+                        // Hide image if loading fails
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  )}
+                  
                   <CardContent sx={{ p: 3 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                       <Typography 

@@ -218,9 +218,8 @@ async def upload_menu_item_image(
         if file_size > max_size:
             raise HTTPException(status_code=400, detail="File too large (max 10MB)")
         
-        service = MenuService(db)
-        image_url = service.upload_menu_item_image(
-            restaurant_uuid, item_uuid, file.filename, content
+        image_url = await MenuService.upload_menu_item_image(
+            db, restaurant_uuid, item_uuid, file.filename, content
         )
         
         if not image_url:
