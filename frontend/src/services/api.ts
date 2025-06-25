@@ -19,6 +19,15 @@ const aiApi: AxiosInstance = axios.create({
   },
 });
 
+// Create dedicated AI service instance for speech operations
+const speechApi: AxiosInstance = axios.create({
+  baseURL: (import.meta.env as any).VITE_AI_SERVICE_URL || 'http://localhost:8003',
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
 // Request interceptor for main API
 api.interceptors.request.use(
   (config) => {
@@ -111,6 +120,55 @@ aiApi.interceptors.response.use(
     if (error.response?.status === 429) {
       // Rate limited
       console.warn('Rate limit exceeded');
+    }
+    
+    return Promise.reject(error);
+  }
+);
+
+// Request interceptor for Speech API
+speechApi.interceptors.request.use(
+  (config) => {
+    // Add request timestamp for debugging
+    (config as any).metadata = { startTime: new Date() };
+    
+    // Add auth token if available (for future use)
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor for Speech API
+speechApi.interceptors.response.use(
+  (response: AxiosResponse) => {
+    // Log response time for debugging
+    const endTime = new Date();
+    const duration = endTime.getTime() - (response.config as any).metadata?.startTime?.getTime();
+    
+    if ((import.meta.env as any).DEV) {
+      console.log(`Speech ${response.config.method?.toUpperCase()} ${response.config.url} - ${duration}ms`);
+    }
+    
+    return response;
+  },
+  (error: AxiosError) => {
+    // Handle common errors
+    if (error.response?.status === 401) {
+      // Unauthorized - clear auth token
+      localStorage.removeItem('auth_token');
+      // Redirect to login if needed
+    }
+    
+    if (error.response?.status === 429) {
+      // Rate limited
+      console.warn('Speech API rate limit exceeded');
     }
     
     return Promise.reject(error);
@@ -214,7 +272,7 @@ export const chatApi = {
     context?: Record<string, any>;
   }) => {
     try {
-      const response = await api.post(`/api/v1/restaurants/${restaurantSlug}/chat`, data);
+      const response = await aiApi.post(`/api/v1/restaurants/${restaurantSlug}/chat`, data);
       return handleApiResponse(response);
     } catch (error) {
       handleApiError(error as AxiosError);
@@ -224,7 +282,7 @@ export const chatApi = {
   // Get conversation suggestions
   getSuggestions: async (restaurantSlug: string, context?: string) => {
     try {
-      const response = await api.get(`/api/v1/restaurants/${restaurantSlug}/chat/suggestions`, {
+      const response = await aiApi.get(`/api/v1/restaurants/${restaurantSlug}/chat/suggestions`, {
         params: { context }
       });
       return handleApiResponse(response);
@@ -236,7 +294,7 @@ export const chatApi = {
   // Submit feedback
   submitFeedback: async (restaurantSlug: string, feedbackData: Record<string, any>) => {
     try {
-      const response = await api.post(`/api/v1/restaurants/${restaurantSlug}/chat/feedback`, feedbackData);
+      const response = await aiApi.post(`/api/v1/restaurants/${restaurantSlug}/chat/feedback`, feedbackData);
       return handleApiResponse(response);
     } catch (error) {
       handleApiError(error as AxiosError);
@@ -246,7 +304,7 @@ export const chatApi = {
   // Get chat analytics
   getAnalytics: async (restaurantSlug: string, days: number = 7) => {
     try {
-      const response = await api.get(`/api/v1/restaurants/${restaurantSlug}/chat/analytics`, {
+      const response = await aiApi.get(`/api/v1/restaurants/${restaurantSlug}/chat/analytics`, {
         params: { days }
       });
       return handleApiResponse(response);
@@ -258,7 +316,7 @@ export const chatApi = {
   // Speech API methods
   transcribeAudio: async (formData: FormData): Promise<{ transcript: string }> => {
     try {
-      const response = await api.post('/api/v1/speech/transcribe', formData, {
+      const response = await speechApi.post('/api/v1/speech/transcribe', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -282,7 +340,7 @@ export const chatApi = {
         formData.append('restaurant_slug', data.restaurant_slug);
       }
 
-      const response = await api.post('/api/v1/speech/synthesize', formData, {
+      const response = await speechApi.post('/api/v1/speech/synthesize', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -296,7 +354,7 @@ export const chatApi = {
 
   getAvailableVoices: async () => {
     try {
-      const response = await api.get('/api/v1/speech/voices');
+      const response = await speechApi.get('/api/v1/speech/voices');
       return handleApiResponse(response);
     } catch (error) {
       handleApiError(error as AxiosError);

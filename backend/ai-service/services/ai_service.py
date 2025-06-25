@@ -209,7 +209,7 @@ class AIService:
                 self.openai_client.chat.completions.create,
                 model=self.model,
                 messages=messages,
-                max_tokens=200,  # Increased for detailed responses with context
+                max_tokens=150,  # Optimized for concise but meaningful responses
                 temperature=0.7,  # Balanced for accuracy vs personality
                 # Note: Grok might not support functions yet, so we'll handle this gracefully
                 # functions=[...] - removed for better compatibility
@@ -309,9 +309,9 @@ MY SPEAKING STYLE:
 - Speak like I'm multitasking - friendly but efficient
 
 HOW I RESPOND:
-- Keep responses short and snappy (under 25 words when possible)
+- Keep responses conversational but concise (30-50 words is perfect)
 - Sound like I'm actually working behind the counter
-- Give quick, helpful answers first - be genuinely helpful
+- Give helpful, meaningful answers with just enough detail
 - Show personality but stay focused
 - Use contractions naturally ("I'm", "you'll", "that's", "we've")
 - Answer questions directly without mentioning prices unless asked
