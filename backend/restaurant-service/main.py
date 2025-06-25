@@ -11,7 +11,7 @@ from typing import List
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'shared'))
 
 from database.connection import init_database, check_database_health
-from routers import restaurants, admin
+from routers import restaurants, admin, ai_proxy
 from middleware import rate_limiting, request_logging, error_handling
 
 # Configure logging
@@ -48,14 +48,16 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(","),
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-)
+# Configure CORS - nginx handles it in development, backend handles it in production
+import os
+if os.getenv("RENDER"):  # Only add CORS on Render (production)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["https://restaurant-ai-frontend.onrender.com", "http://localhost:3000", "http://localhost:5173"],
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["*"],
+    )
 
 # Add security middleware
 app.add_middleware(
@@ -71,6 +73,7 @@ app.middleware("http")(error_handling.global_exception_handler)
 # Include routers
 app.include_router(restaurants.router, prefix="/api/v1", tags=["restaurants"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
+app.include_router(ai_proxy.router, prefix="/api/v1", tags=["ai-proxy"])
 
 @app.get("/")
 async def root():

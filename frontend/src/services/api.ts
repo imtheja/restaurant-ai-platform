@@ -10,18 +10,23 @@ const api: AxiosInstance = axios.create({
   },
 });
 
-// Create separate AI service instance
+// In development, all services go through nginx gateway to avoid CORS
+// In production, we can use direct service URLs
+const isDevelopment = (import.meta.env as any).DEV || (import.meta.env as any).VITE_APP_ENV !== 'production';
+
+// On Render, all API calls go through restaurant service (no gateway)
+// In development, all calls go through nginx gateway
 const aiApi: AxiosInstance = axios.create({
-  baseURL: (import.meta.env as any).VITE_AI_SERVICE_URL || 'http://localhost:8003',
+  baseURL: (import.meta.env as any).VITE_API_BASE_URL || 'http://localhost:8000',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Create dedicated AI service instance for speech operations
+// Speech API also uses same base URL (goes through restaurant service on Render)
 const speechApi: AxiosInstance = axios.create({
-  baseURL: (import.meta.env as any).VITE_AI_SERVICE_URL || 'http://localhost:8003',
+  baseURL: (import.meta.env as any).VITE_API_BASE_URL || 'http://localhost:8000',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
