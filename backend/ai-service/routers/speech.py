@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response
 from sqlalchemy.orm import Session
 import openai
 import io
@@ -115,6 +115,11 @@ class SpeechService:
             # Generic error fallback
             raise HTTPException(status_code=500, detail=f"Speech generation failed: {str(e)}")
 
+@router.head("/speech/transcribe")
+async def transcribe_speech_head():
+    """Handle HEAD requests for speech transcription endpoint"""
+    return Response(status_code=200)
+
 @router.post("/speech/transcribe")
 async def transcribe_speech(
     audio: UploadFile = File(...),
@@ -139,6 +144,11 @@ async def transcribe_speech(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+@router.head("/speech/synthesize")
+async def synthesize_speech_head():
+    """Handle HEAD requests for speech synthesis endpoint"""
+    return Response(status_code=200)
 
 @router.post("/speech/synthesize")
 async def synthesize_speech(
