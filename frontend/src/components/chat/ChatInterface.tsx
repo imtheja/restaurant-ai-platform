@@ -823,11 +823,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
                 }
               }}
             />
-            <IconButton
+            <Button
               onClick={isListening ? stopListening : startListening}
               disabled={sendMessageMutation.isLoading}
+              variant="contained"
+              startIcon={isListening ? <MicOff /> : <Mic />}
               sx={{ 
-                width: 48,
+                minWidth: 100,
                 height: 48,
                 borderRadius: '12px',
                 background: isListening 
@@ -836,15 +838,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
                 color: 'white',
                 border: '2px solid white',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                fontWeight: 600,
+                fontSize: '16px',
+                textTransform: 'none',
                 '&:hover': { 
-                  transform: 'scale(1.1)',
-                  boxShadow: '0 6px 16px rgba(0,0,0,0.3)'
+                  transform: 'scale(1.05)',
+                  boxShadow: '0 6px 16px rgba(0,0,0,0.3)',
+                  background: isListening 
+                    ? 'linear-gradient(135deg, #FF6B9D 0%, #FF8E53 100%)' 
+                    : 'linear-gradient(135deg, #FF8E53 0%, #FFD93D 100%)',
                 },
                 transition: 'all 0.3s ease'
               }}
             >
-              {isListening ? <MicOff /> : <Mic />}
-            </IconButton>
+              {isListening ? 'Stop' : 'Talk'}
+            </Button>
             <IconButton
               onClick={() => sendMessage()}
               disabled={!inputMessage.trim() || sendMessageMutation.isLoading}

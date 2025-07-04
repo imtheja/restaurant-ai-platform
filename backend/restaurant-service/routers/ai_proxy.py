@@ -19,6 +19,10 @@ async def proxy_request(request: Request, target_path: str) -> Response:
         headers.pop('host', None)
         headers.pop('content-length', None)
         
+        # Add internal service header to bypass rate limiting
+        headers['X-Internal-Service'] = 'restaurant-service'
+        print(f"DEBUG: Proxying to {target_path} with headers: {headers.get('X-Internal-Service')}")
+        
         # Build target URL
         target_url = f"{AI_SERVICE_URL}{target_path}"
         
