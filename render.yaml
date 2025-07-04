@@ -10,6 +10,12 @@ services:
         source: /api/*
         destination: https://restaurant-ai-restaurant-service.onrender.com/api/:splat
       - type: rewrite
+        source: /assets/*
+        destination: /assets/:splat
+      - type: rewrite
+        source: /favicon.*
+        destination: /favicon.:splat
+      - type: rewrite
         source: /r/*
         destination: /index.html
       - type: rewrite
