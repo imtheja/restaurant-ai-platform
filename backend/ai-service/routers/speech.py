@@ -22,6 +22,9 @@ class SpeechService:
         # OpenAI API configuration (standardized to use only OpenAI)
         api_key = os.getenv("OPENAI_API_KEY")
         
+        # Check text-only mode
+        self.text_only_mode = os.getenv("TEXT_ONLY_MODE", "false").lower() == "true"
+        
         # Check if we have a valid API key (not development placeholder)
         self.api_key_available = bool(
             api_key and 
@@ -72,6 +75,12 @@ class SpeechService:
     
     async def generate_speech(self, text: str, voice: str = "alloy") -> bytes:
         """Generate speech using OpenAI TTS"""
+        # Return silent audio if in text-only mode
+        if self.text_only_mode:
+            # Return minimal silent MP3 file
+            silent_mp3 = b'\xff\xfb\x90\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+            return silent_mp3
+            
         if not self.api_key_available:
             # Fallback: return a very short silent audio file for development
             # This is a minimal MP3 file (silent, 1 second)
@@ -238,6 +247,23 @@ async def get_available_voices():
         return create_success_response(
             data={"voices": voices},
             message="Available voices retrieved successfully"
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+@router.get("/speech/config")
+async def get_speech_config():
+    """Get speech service configuration including text-only mode status"""
+    try:
+        service = SpeechService()
+        
+        return create_success_response(
+            data={
+                "text_only_mode": service.text_only_mode,
+                "api_available": service.api_key_available
+            },
+            message="Speech configuration retrieved successfully"
         )
         
     except Exception as e:

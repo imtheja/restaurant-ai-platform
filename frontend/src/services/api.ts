@@ -427,6 +427,15 @@ export const chatApi = {
       handleApiError(error as AxiosError);
     }
   },
+
+  getSpeechConfig: async () => {
+    try {
+      const response = await speechApi.get('/api/v1/speech/config');
+      return handleApiResponse(response);
+    } catch (error) {
+      handleApiError(error as AxiosError);
+    }
+  },
 };
 
 // Menu Image API
