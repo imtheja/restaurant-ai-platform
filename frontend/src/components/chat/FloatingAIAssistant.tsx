@@ -38,7 +38,6 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
   onOpenChange,
 }) => {
   const [open, setOpen] = useState(false);
-  const [hasInitialized, setHasInitialized] = useState(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -59,30 +58,9 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
     }
   }, [shouldAutoOpen, open]);
 
-  // Initialize chat early
-  React.useEffect(() => {
-    if (!hasInitialized) {
-      setHasInitialized(true);
-    }
-  }, [hasInitialized]);
-
   return (
     <>
-      {/* Hidden ChatInterface for early initialization */}
-      <Box sx={{ display: 'none' }}>
-        <ChatInterface
-          restaurantSlug={restaurantSlug}
-          onChatReady={(sendMessage) => {
-            console.log('FloatingAIAssistant: ChatInterface is ready, forwarding to parent');
-            if (onChatReady) {
-              onChatReady(sendMessage);
-            } else {
-              console.log('FloatingAIAssistant: No onChatReady callback from parent');
-            }
-          }}
-          isEmbedded={true}
-        />
-      </Box>
+      {/* Hidden ChatInterface for early initialization - no longer needed */}
 
       {/* Floating Action Button */}
       <Fab
@@ -201,8 +179,21 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
           <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             <ChatInterface
               restaurantSlug={restaurantSlug}
-              onChatReady={() => {
-                // This instance is just for display, the hidden one handles the callback
+              onChatReady={(sendMessage) => {
+                console.log('FloatingAIAssistant: Visible ChatInterface is ready');
+                // Forward the sendMessage function to the parent
+                if (onChatReady) {
+                  onChatReady((message: string, context?: any) => {
+                    // Ensure the dialog is open before sending the message
+                    if (!open) {
+                      handleOpen();
+                      // Wait for the dialog to open, then send the message
+                      setTimeout(() => sendMessage(message, context), 300);
+                    } else {
+                      sendMessage(message, context);
+                    }
+                  });
+                }
               }}
               isEmbedded={true}
             />

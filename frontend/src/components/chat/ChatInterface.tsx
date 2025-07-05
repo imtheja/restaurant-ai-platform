@@ -869,38 +869,46 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
                 }
               }}
             />
-            {!speechConfig?.data?.text_only_mode && (
-              <Button
-                onClick={isListening ? stopListening : startListening}
-                disabled={isStreamingResponse}
-                variant="contained"
-                startIcon={isListening ? <MicOff /> : <Mic />}
-                sx={{ 
-                  minWidth: 100,
-                  height: 48,
-                  borderRadius: '12px',
-                  background: isListening 
+            <Button
+              onClick={isListening ? stopListening : startListening}
+              disabled={isStreamingResponse || speechConfig?.data?.text_only_mode}
+              variant="contained"
+              startIcon={isListening ? <MicOff /> : <Mic />}
+              sx={{ 
+                minWidth: 100,
+                height: 48,
+                borderRadius: '12px',
+                background: speechConfig?.data?.text_only_mode 
+                  ? 'linear-gradient(135deg, #9E9E9E 0%, #757575 100%)'
+                  : isListening 
                     ? 'linear-gradient(135deg, #FF6B9D 0%, #FF8E53 100%)' 
                     : 'linear-gradient(135deg, #FF8E53 0%, #FFD93D 100%)',
-                  color: 'white',
-                  border: '2px solid white',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                  fontWeight: 600,
-                  fontSize: '16px',
-                  textTransform: 'none',
-                  '&:hover': { 
-                    transform: 'scale(1.05)',
-                    boxShadow: '0 6px 16px rgba(0,0,0,0.3)',
-                    background: isListening 
+                color: speechConfig?.data?.text_only_mode ? '#BDBDBD' : 'white',
+                border: '2px solid white',
+                boxShadow: speechConfig?.data?.text_only_mode 
+                  ? '0 2px 6px rgba(0,0,0,0.1)' 
+                  : '0 4px 12px rgba(0,0,0,0.2)',
+                fontWeight: 600,
+                fontSize: '16px',
+                textTransform: 'none',
+                opacity: speechConfig?.data?.text_only_mode ? 0.6 : 1,
+                cursor: speechConfig?.data?.text_only_mode ? 'not-allowed' : 'pointer',
+                '&:hover': { 
+                  transform: speechConfig?.data?.text_only_mode ? 'none' : 'scale(1.05)',
+                  boxShadow: speechConfig?.data?.text_only_mode 
+                    ? '0 2px 6px rgba(0,0,0,0.1)' 
+                    : '0 6px 16px rgba(0,0,0,0.3)',
+                  background: speechConfig?.data?.text_only_mode 
+                    ? 'linear-gradient(135deg, #9E9E9E 0%, #757575 100%)'
+                    : isListening 
                       ? 'linear-gradient(135deg, #FF6B9D 0%, #FF8E53 100%)' 
                       : 'linear-gradient(135deg, #FF8E53 0%, #FFD93D 100%)',
-                  },
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                {isListening ? 'Stop' : 'Talk'}
-              </Button>
-            )}
+                },
+                transition: 'all 0.3s ease'
+              }}
+            >
+              {isListening ? 'Stop' : 'Talk'}
+            </Button>
             <IconButton
               onClick={() => sendMessage()}
               disabled={!inputMessage.trim() || isStreamingResponse}
