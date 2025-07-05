@@ -20,6 +20,29 @@ class MenuCacheService:
         # Cache TTL (24 hours)
         self.cache_ttl = 24 * 60 * 60
         
+        # Common greetings and responses for instant reply
+        self.instant_responses = {
+            # Greetings
+            "hello": "Hello! Welcome to The Cookie Jar! I'm Baker Betty, your cookie expert. What delicious treat can I help you find today?",
+            "hi": "Hi there! Welcome to The Cookie Jar! What kind of cookie are you craving today?",
+            "hey": "Hey! Great to see you at The Cookie Jar! What can I get for you today?",
+            "good morning": "Good morning! Welcome to The Cookie Jar! Nothing beats fresh cookies to start your day. What would you like?",
+            "good afternoon": "Good afternoon! Welcome to The Cookie Jar! Ready for a sweet treat?",
+            "good evening": "Good evening! Welcome to The Cookie Jar! How about a delicious cookie to end your day?",
+            
+            # Common questions
+            "what do you have": "We have an amazing selection of cookies! Our menu includes Classic Chocolate Chip, Double Chocolate Chip, Oatmeal Raisin, Peanut Butter, Sugar Cookies, and many more specialty options. What type of cookie are you in the mood for?",
+            "what's popular": "Our most popular cookies are the Classic Chocolate Chip and Double Chocolate Chip! The Chocolate Chip is a timeless favorite with semi-sweet chocolate chips, while the Double Chocolate is perfect for serious chocolate lovers. Would you like to try one of these?",
+            "what's your best seller": "Our Classic Chocolate Chip Cookie is our all-time best seller! It's made with premium butter, semi-sweet chocolate chips, and baked to perfection. Would you like to try one?",
+            "do you have chocolate": "Yes! We have several chocolate options: Classic Chocolate Chip, Double Chocolate Chip, Chocolate Peanut Butter Chip, and White Chocolate Macadamia. Which one sounds good to you?",
+            
+            # Closing
+            "thank you": "You're very welcome! Enjoy your delicious cookies! Have a wonderful day!",
+            "thanks": "My pleasure! Enjoy your treats!",
+            "bye": "Goodbye! Thanks for visiting The Cookie Jar! Come back soon!",
+            "goodbye": "Goodbye! It was lovely helping you today. Enjoy your cookies!"
+        }
+        
         # Question patterns that are cacheable
         self.cacheable_patterns = {
             'description': [
@@ -96,8 +119,12 @@ class MenuCacheService:
 
     def _generate_cache_key(self, restaurant_id: str, question_type: str, item_id: str) -> str:
         """Generate cache key for the question"""
-        key_data = f"menu_question:{restaurant_id}:{question_type}:{item_id}"
+        key_data = f"restaurant:{restaurant_id}:menu_question:{question_type}:{item_id}"
         return key_data
+        
+    def _generate_instant_response_key(self, restaurant_id: str, message_key: str) -> str:
+        """Generate cache key for instant responses"""
+        return f"restaurant:{restaurant_id}:instant:{message_key}"
 
     def _generate_deterministic_response(self, question_type: str, item: MenuItem) -> Optional[str]:
         """Generate deterministic response for cacheable questions"""
@@ -138,9 +165,28 @@ class MenuCacheService:
             
         return None
 
+    def _check_instant_response(self, message: str) -> Optional[str]:
+        """Check for instant responses to common greetings/questions"""
+        message_lower = message.lower().strip()
+        
+        # Direct match
+        if message_lower in self.instant_responses:
+            return self.instant_responses[message_lower]
+        
+        # Fuzzy match for variations
+        for key, response in self.instant_responses.items():
+            if key in message_lower or message_lower in key:
+                return response
+                
+        return None
+
     async def get_cached_response(self, restaurant_id: str, message: str) -> Optional[str]:
         """Check if we have a cached response for this question"""
         try:
+            # First check instant responses (no Redis lookup needed)
+            instant_response = self._check_instant_response(message)
+            if instant_response:
+                return instant_response
             # Classify the question
             classification = self._classify_question(message)
             if not classification:
@@ -183,7 +229,8 @@ class MenuCacheService:
     def invalidate_restaurant_cache(self, restaurant_id: str):
         """Invalidate all cached responses for a restaurant"""
         try:
-            pattern = f"menu_question:{restaurant_id}:*"
+            # Updated pattern to match new key structure
+            pattern = f"restaurant:{restaurant_id}:*"
             keys = self.redis_client.keys(pattern)
             if keys:
                 self.redis_client.delete(*keys)

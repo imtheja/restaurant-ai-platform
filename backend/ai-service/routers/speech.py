@@ -86,7 +86,7 @@ class SpeechService:
             
             # Generate speech using OpenAI TTS
             response = self.openai_client.audio.speech.create(
-                model="tts-1-hd",  # High quality model
+                model="tts-1",  # Faster model (2x speed, minimal quality difference)
                 voice=voice,
                 input=clean_text,
                 response_format="mp3",
