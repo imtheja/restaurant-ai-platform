@@ -16,17 +16,21 @@ from database.models import Restaurant, Conversation, Message, MenuItem, MenuCat
 from database.connection import db_manager
 from schemas import ChatResponse
 from utils import generate_session_id, extract_keywords, safe_json_loads, safe_json_dumps
+from .menu_cache_service import MenuCacheService
 
 class AIService:
     def __init__(self, db: Session):
         self.db = db
+        
+        # Initialize cache service
+        self.cache_service = MenuCacheService(db)
         
         # OpenAI API configuration (standardized to use only OpenAI)
         api_key = os.getenv("OPENAI_API_KEY")
         
         # Initialize OpenAI client
         self.openai_client = openai.OpenAI(api_key=api_key)
-        self.model = os.getenv("OPENAI_MODEL", "gpt-4-turbo-preview")
+        self.model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")  # Faster model for real-time
             
         self.max_conversation_length = 50
     
@@ -89,6 +93,49 @@ class AIService:
         restaurant = self.db.query(Restaurant).filter(
             Restaurant.id == conversation.restaurant_id
         ).first()
+        
+        # Check cache for common menu questions first
+        cached_response = await self.cache_service.get_cached_response(
+            restaurant_id=str(restaurant.id),
+            message=message
+        )
+        
+        if cached_response:
+            # Record cached AI response
+            ai_message = Message(
+                conversation_id=conversation.id,
+                sender_type="ai",
+                content=cached_response,
+                meta_data={"from_cache": True}
+            )
+            self.db.add(ai_message)
+            
+            # Update conversation activity
+            conversation.last_activity = datetime.utcnow()
+            if context:
+                conversation.context = {**(conversation.context or {}), **context}
+            
+            # Record analytics
+            self._record_interaction_analytics(
+                restaurant_id=restaurant.id,
+                conversation_id=conversation.id,
+                event_type="chat_message_cached",
+                event_data={
+                    "user_message": message,
+                    "ai_response": cached_response,
+                    "from_cache": True
+                }
+            )
+            
+            self.db.commit()
+            
+            return {
+                "message": cached_response,
+                "suggestions": [],
+                "recommendations": [],
+                "conversation_id": str(conversation.id),
+                "message_id": str(ai_message.id)
+            }
         
         menu_context = await self._get_menu_context(restaurant.id)
         avatar_config = restaurant.avatar_config or {}
@@ -156,6 +203,132 @@ class AIService:
             "message_id": str(ai_message.id)
         }
     
+    async def process_chat_message_stream(
+        self, 
+        conversation: Conversation, 
+        message: str,
+        context: Optional[Dict[str, Any]] = None
+    ):
+        """Process chat message with streaming response for real-time conversation"""
+        import json
+        
+        # Record user message (async to reduce blocking)
+        user_message = Message(
+            conversation_id=conversation.id,
+            sender_type="customer",
+            content=message,
+            meta_data=context
+        )
+        self.db.add(user_message)
+        
+        # Get cached restaurant data (optimize with simple query)
+        restaurant = self.db.query(Restaurant).filter(
+            Restaurant.id == conversation.restaurant_id
+        ).first()
+        
+        # Check cache for common menu questions first (faster than AI)
+        cached_response = await self.cache_service.get_cached_response(
+            restaurant_id=str(restaurant.id),
+            message=message
+        )
+        
+        if cached_response:
+            # Yield cached response as a single chunk
+            ai_message = Message(
+                conversation_id=conversation.id,
+                sender_type="ai",
+                content=cached_response,
+                meta_data={"from_cache": True}
+            )
+            self.db.add(ai_message)
+            
+            # Update conversation activity
+            conversation.last_activity = datetime.utcnow()
+            if context:
+                conversation.context = {**(conversation.context or {}), **context}
+            
+            # Commit changes
+            self.db.commit()
+            
+            # Yield the cached response
+            yield f"data: {json.dumps({'content': cached_response})}\n\n"
+            yield "data: [DONE]\n\n"
+            return
+        
+        # Build lightweight context for faster processing
+        quick_context = {
+            "restaurant_name": restaurant.name,
+            "cuisine_type": restaurant.cuisine_type,
+            "avatar_name": restaurant.avatar_config.get("name", "Assistant") if restaurant.avatar_config else "Assistant"
+        }
+        
+        # Get recent conversation history (limit to 3 messages for speed)
+        recent_history = self._get_conversation_history(conversation.id, limit=3)
+        
+        # Build streamlined prompt
+        system_prompt = f"""You are {quick_context['avatar_name']}, a friendly {quick_context['cuisine_type']} restaurant assistant for {quick_context['restaurant_name']}. 
+Keep responses under 50 words, warm and helpful. Focus on menu questions and recommendations."""
+        
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # Add limited recent history
+        for msg in recent_history:
+            messages.append({
+                "role": "user" if msg["sender_type"] == "customer" else "assistant",
+                "content": msg["content"]
+            })
+        
+        messages.append({"role": "user", "content": message})
+        
+        # Streaming response
+        try:
+            api_key = os.getenv("OPENAI_API_KEY")
+            
+            if not api_key or api_key.startswith("your_") or api_key == "sk-fake-key-for-development-only":
+                # Quick fallback for development
+                fallback_response = f"I'd be happy to help you with {quick_context['restaurant_name']}! What would you like to know about our menu?"
+                yield json.dumps({"type": "token", "content": fallback_response})
+                yield json.dumps({"type": "done", "message_id": str(user_message.id)})
+                return
+            
+            # Stream from OpenAI
+            response_stream = await asyncio.to_thread(
+                self.openai_client.chat.completions.create,
+                model=self.model,
+                messages=messages,
+                max_tokens=75,  # Shorter for faster responses
+                temperature=0.8,  # Slightly higher for personality
+                stream=True
+            )
+            
+            full_response = ""
+            for chunk in response_stream:
+                if chunk.choices[0].delta.content:
+                    content = chunk.choices[0].delta.content
+                    full_response += content
+                    yield json.dumps({"type": "token", "content": content})
+            
+            # Record AI message after streaming
+            ai_message = Message(
+                conversation_id=conversation.id,
+                sender_type="ai",
+                content=full_response,
+                meta_data={}
+            )
+            self.db.add(ai_message)
+            
+            # Update conversation activity
+            conversation.last_activity = datetime.utcnow()
+            self.db.commit()
+            
+            yield json.dumps({"type": "done", "message_id": str(ai_message.id)})
+            
+        except Exception as e:
+            # Quick fallback on error
+            error_response = "I'm here to help! What can I tell you about our delicious options?"
+            yield json.dumps({"type": "token", "content": error_response})
+            yield json.dumps({"type": "error", "error": str(e)})
+    
     async def _generate_ai_response(
         self, 
         message: str,
@@ -209,8 +382,8 @@ class AIService:
                 self.openai_client.chat.completions.create,
                 model=self.model,
                 messages=messages,
-                max_tokens=150,  # Optimized for concise but meaningful responses
-                temperature=0.7,  # Balanced for accuracy vs personality
+                max_tokens=100,  # Shorter for faster responses
+                temperature=0.8,  # Slightly higher for personality
                 # Note: Grok might not support functions yet, so we'll handle this gracefully
                 # functions=[...] - removed for better compatibility
             )
@@ -449,12 +622,12 @@ IMPORTANT:
         
         return "\n".join(summary_parts)
     
-    def _get_conversation_history(self, conversation_id: uuid.UUID) -> List[Dict[str, str]]:
+    def _get_conversation_history(self, conversation_id: uuid.UUID, limit: int = 20) -> List[Dict[str, str]]:
         """Get recent conversation history"""
         
         messages = self.db.query(Message).filter(
             Message.conversation_id == conversation_id
-        ).order_by(Message.created_at.desc()).limit(20).all()
+        ).order_by(Message.created_at.desc()).limit(limit).all()
         
         # Reverse to get chronological order
         messages.reverse()

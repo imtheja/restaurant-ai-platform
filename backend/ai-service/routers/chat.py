@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 import uuid
 import sys
@@ -53,6 +54,50 @@ async def chat_with_ai(
         return create_success_response(
             data=ai_response,
             message="Chat response generated successfully"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+@router.post("/restaurants/{restaurant_slug}/chat/stream")
+async def chat_with_ai_stream(
+    restaurant_slug: str = Path(..., description="Restaurant slug"),
+    chat_request: ChatRequest = ...,
+    db: Session = Depends(get_db)
+):
+    """Stream AI response for real-time conversation"""
+    try:
+        service = AIService(db)
+        
+        # Get or create conversation
+        conversation = service.get_or_create_conversation(
+            restaurant_slug=restaurant_slug,
+            session_id=chat_request.session_id,
+            context=chat_request.context
+        )
+        
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Restaurant not found")
+        
+        # Stream AI response
+        async def generate_stream():
+            async for chunk in service.process_chat_message_stream(
+                conversation=conversation,
+                message=chat_request.message,
+                context=chat_request.context
+            ):
+                yield f"data: {chunk}\n\n"
+        
+        return StreamingResponse(
+            generate_stream(),
+            media_type="text/plain",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no"
+            }
         )
         
     except HTTPException:

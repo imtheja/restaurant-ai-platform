@@ -24,15 +24,29 @@ async def rate_limit_middleware(request: Request, call_next):
     internal_service_header = request.headers.get("X-Internal-Service")
     
     # Check if request is from restaurant service (internal proxy)
-    if internal_service_header or "restaurant-ai-" in user_agent:
+    if internal_service_header:
         print(f"DEBUG: Skipping rate limit - Internal service: {internal_service_header}, User-Agent: {user_agent}")
+        return await call_next(request)
+    
+    # Check for restaurant-ai services in user agent
+    if "restaurant-ai-" in user_agent:
+        print(f"DEBUG: Skipping rate limit - Restaurant AI service detected in User-Agent: {user_agent}")
         return await call_next(request)
     
     # Check if on Render and request is from another Render service
     if os.getenv("RENDER"):
         forwarded_for = request.headers.get("X-Forwarded-For", "")
+        real_ip = request.headers.get("X-Real-IP", "")
+        
+        # Skip rate limiting for internal Render services
         # Render internal IPs typically start with 10.x.x.x
-        if forwarded_for.startswith("10."):
+        if forwarded_for.startswith("10.") or real_ip.startswith("10."):
+            print(f"DEBUG: Skipping rate limit - Render internal IP detected: {forwarded_for or real_ip}")
+            return await call_next(request)
+            
+        # Also check if the request comes from our own services on Render
+        if any(service in str(request.url) for service in ["restaurant-ai-restaurant-service", "restaurant-ai-frontend"]):
+            print(f"DEBUG: Skipping rate limit - Request from own service: {request.url}")
             return await call_next(request)
     
     redis_client = get_redis()

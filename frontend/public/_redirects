@@ -1,5 +1,9 @@
 # SPA fallback for client-side routing
+# Handle favicon
 /favicon.ico  /favicon.svg  200
+
+# Proxy API requests to backend
 /api/*  https://restaurant-ai-restaurant-service.onrender.com/api/:splat  200
-/r/*  /index.html  200
+
+# SPA routing - ALL routes should go to index.html for client-side routing
 /*  /index.html  200

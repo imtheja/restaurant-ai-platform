@@ -21,7 +21,13 @@ async def proxy_request(request: Request, target_path: str) -> Response:
         
         # Add internal service header to bypass rate limiting
         headers['X-Internal-Service'] = 'restaurant-service'
-        print(f"DEBUG: Proxying to {target_path} with headers: {headers.get('X-Internal-Service')}")
+        
+        # Add API key if configured (for production)
+        internal_api_key = os.getenv("INTERNAL_API_KEY")
+        if internal_api_key:
+            headers['X-API-Key'] = internal_api_key
+            
+        print(f"DEBUG: Proxying to {target_path} with headers: Internal-Service={headers.get('X-Internal-Service')}, API-Key={'[SET]' if headers.get('X-API-Key') else '[NOT SET]'}")
         
         # Build target URL
         target_url = f"{AI_SERVICE_URL}{target_path}"
@@ -70,6 +76,10 @@ async def proxy_request(request: Request, target_path: str) -> Response:
 @router.post("/restaurants/{restaurant_slug}/chat")
 async def proxy_chat(restaurant_slug: str, request: Request):
     return await proxy_request(request, f"/api/v1/restaurants/{restaurant_slug}/chat")
+
+@router.post("/restaurants/{restaurant_slug}/chat/stream")
+async def proxy_chat_stream(restaurant_slug: str, request: Request):
+    return await proxy_request(request, f"/api/v1/restaurants/{restaurant_slug}/chat/stream")
 
 @router.get("/restaurants/{restaurant_slug}/chat/suggestions")
 async def proxy_chat_suggestions(restaurant_slug: str, request: Request):

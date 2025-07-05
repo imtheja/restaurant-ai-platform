@@ -86,6 +86,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
   const [sessionId] = useState(() => `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
   const [, setSpeechTranscript] = useState('');
   const [, setIsProcessingSpeech] = useState(false);
+  const [isStreamingResponse, setIsStreamingResponse] = useState(false);
   const [selectedVoice, setSelectedVoice] = useState('nova'); // Default to nova for bakery
   const [showVoiceMenu, setShowVoiceMenu] = useState(false);
   const [voiceMenuAnchor, setVoiceMenuAnchor] = useState<null | HTMLElement>(null);
@@ -118,35 +119,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
     }
   );
 
-  // Send message mutation
-  const sendMessageMutation = useMutation(
-    ({ message, context }: { message: string, context?: any }) => chatApi.sendMessage(restaurantSlug, {
-      message,
-      session_id: sessionId,
-      context: context || { source: 'voice_chat' }
-    }),
-    {
-      onSuccess: (response) => {
-        const aiMessage: ChatMessage = {
-          id: (response as any).message_id,
-          conversation_id: (response as any).conversation_id,
-          sender_type: 'ai',
-          content: (response as any).message,
-          message_type: 'text',
-          created_at: new Date().toISOString()
-        };
-        setMessages(prev => [...prev, aiMessage]);
-
-        // Speak the AI response if speech is enabled
-        if (speechEnabled && (response as any).message) {
-          speakTextWithOpenAI((response as any).message);
-        }
-      },
-      onError: (error: Error) => {
-        toast.error(error.message || 'Failed to send message');
-      }
-    }
-  );
+  // Note: Now using streaming instead of mutation for real-time responses
 
   // Initialize speech recognition and audio
   useEffect(() => {
@@ -530,11 +503,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
     toast.success(`Voice changed to ${voiceId}`);
   };
 
-  const sendMessage = useCallback((message?: string, context?: any) => {
+  const sendMessage = useCallback(async (message?: string, context?: any) => {
     const messageToSend = message || inputMessage.trim();
     console.log('ChatInterface: sendMessage called with:', messageToSend, 'context:', context);
     if (!messageToSend) return;
-
 
     // Add user message
     const userMessage: ChatMessage = {
@@ -548,10 +520,66 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
 
     setMessages(prev => [...prev, userMessage]);
     
-    // Send to AI
-    sendMessageMutation.mutate({ message: messageToSend, context });
+    // Create AI message placeholder for streaming
+    const aiMessageId = `ai-${Date.now()}`;
+    const aiMessage: ChatMessage = {
+      id: aiMessageId,
+      conversation_id: sessionId,
+      sender_type: 'ai',
+      content: '',
+      message_type: 'text',
+      created_at: new Date().toISOString()
+    };
+    
+    setMessages(prev => [...prev, aiMessage]);
+    
+    // Stream AI response
+    let fullResponse = '';
+    setIsStreamingResponse(true);
+    
+    try {
+      await chatApi.sendMessageStream(
+        restaurantSlug,
+        {
+          message: messageToSend,
+          session_id: sessionId,
+          context: context || { source: 'voice_chat' }
+        },
+        // onChunk - update message content as it streams
+        (chunk: string) => {
+          fullResponse += chunk;
+          setMessages(prev => prev.map(msg => 
+            msg.id === aiMessageId 
+              ? { ...msg, content: fullResponse }
+              : msg
+          ));
+        },
+        // onComplete
+        () => {
+          setIsStreamingResponse(false);
+          // Speak the complete AI response if speech is enabled
+          if (speechEnabled && fullResponse) {
+            speakTextWithOpenAI(fullResponse);
+          }
+        },
+        // onError
+        (error: string) => {
+          setIsStreamingResponse(false);
+          toast.error(error || 'Failed to get AI response');
+          // Remove the failed AI message
+          setMessages(prev => prev.filter(msg => msg.id !== aiMessageId));
+        }
+      );
+    } catch (error) {
+      console.error('Streaming error:', error);
+      setIsStreamingResponse(false);
+      toast.error('Failed to send message');
+      // Remove the failed AI message
+      setMessages(prev => prev.filter(msg => msg.id !== aiMessageId));
+    }
+    
     if (!message) setInputMessage(''); // Only clear input if it was typed
-  }, [inputMessage, sessionId, sendMessageMutation]);
+  }, [inputMessage, sessionId, restaurantSlug, speechEnabled, speakTextWithOpenAI]);
 
   // Expose sendMessage function to parent - ensure all dependencies are ready
   useEffect(() => {
@@ -775,7 +803,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
                 </motion.div>
               ))}
             </AnimatePresence>
-            {sendMessageMutation.isLoading && (
+            {isStreamingResponse && (
               <ListItem sx={{ justifyContent: 'flex-start' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 2 }}>
                   <CircularProgress size={16} />
@@ -805,7 +833,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              disabled={isListening || sendMessageMutation.isLoading}
+              disabled={isListening || isStreamingResponse}
               variant="outlined"
               size="small"
               sx={{
@@ -825,7 +853,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
             />
             <Button
               onClick={isListening ? stopListening : startListening}
-              disabled={sendMessageMutation.isLoading}
+              disabled={isStreamingResponse}
               variant="contained"
               startIcon={isListening ? <MicOff /> : <Mic />}
               sx={{ 
@@ -855,7 +883,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
             </Button>
             <IconButton
               onClick={() => sendMessage()}
-              disabled={!inputMessage.trim() || sendMessageMutation.isLoading}
+              disabled={!inputMessage.trim() || isStreamingResponse}
               sx={{
                 width: 48,
                 height: 48,
