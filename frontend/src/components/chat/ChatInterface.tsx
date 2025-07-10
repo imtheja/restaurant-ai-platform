@@ -241,7 +241,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
         welcomeContent = "Hi! How can I help?";
       } else {
         // First-time welcome - use short greeting for menu interactions  
-        welcomeContent = restaurantData?.avatar_config?.greeting || "Hi! How can I help you with our menu today?";
+        welcomeContent = (avatarConfig as any)?.greeting || "Hi! How can I help you with our menu today?";
         sessionStorage.setItem(welcomeKey, 'true');
       }
 
@@ -834,7 +834,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 2 }}>
                   <CircularProgress size={16} />
                   <Typography variant="body2" color="text.secondary">
-                    {restaurantData?.avatar_config?.name || 'Assistant'} is typing...
+                    {(avatarConfig as any)?.name || 'Assistant'} is typing...
                   </Typography>
                 </Box>
               </ListItem>
@@ -855,7 +855,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
               fullWidth
               multiline
               maxRows={3}
-              placeholder={isListening ? "Listening..." : `Ask ${restaurantData?.avatar_config?.name || 'our assistant'} anything...`}
+              placeholder={isListening ? "Listening..." : `Ask ${(avatarConfig as any)?.name || 'our assistant'} anything...`}
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
