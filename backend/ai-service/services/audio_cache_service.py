@@ -77,14 +77,14 @@ class AudioCacheService:
             print(f"Error generating audio: {e}")
             return None
             
-    async def warmup_common_responses(self, restaurant_id: str, restaurant_name: str = "The Cookie Jar"):
+    async def warmup_common_responses(self, restaurant_id: str, restaurant_name: str):
         """Pre-generate and cache audio for common responses"""
         # Customize responses with restaurant name
         common_responses = [
             # Greetings
-            "Hello! Welcome to The Cookie Jar! I'm Baker Betty, your cookie expert. What delicious treat can I help you find today?",
-            "Hi there! Welcome to The Cookie Jar! What kind of cookie are you craving today?",
-            "Good morning! Welcome to The Cookie Jar! Nothing beats fresh cookies to start your day. What would you like?",
+            f"Hello! Welcome to {restaurant_name}! I'm your cookie expert. What delicious treat can I help you find today?",
+            f"Hi there! Welcome to {restaurant_name}! What kind of cookie are you craving today?",
+            f"Good morning! Welcome to {restaurant_name}! Nothing beats fresh cookies to start your day. What would you like?",
             
             # Common responses
             "Our Classic Chocolate Chip Cookie is our all-time best seller! It's made with premium butter, semi-sweet chocolate chips, and baked to perfection. Would you like to try one?",

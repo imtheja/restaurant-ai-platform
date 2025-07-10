@@ -21,14 +21,14 @@ const LandingPage: React.FC = () => {
               🍪 Try our sample restaurant:
             </Typography>
             <Typography variant="body1" sx={{ mb: 2 }}>
-              The Cookie Jar - Gourmet warm cookies made fresh daily
+              Chip Cookies - Warm fresh gourmet cookies delivered to your door
             </Typography>
             <Button 
               variant="contained" 
               size="large"
-              onClick={() => navigate('/r/the-cookie-jar')}
+              onClick={() => navigate('/r/chip-cookies')}
             >
-              Visit The Cookie Jar
+              Visit Chip Cookies
             </Button>
           </CardContent>
         </Card>

@@ -23,7 +23,7 @@ class MenuCacheService:
         # Common greetings and responses for instant reply
         self.instant_responses = {
             # Greetings
-            "hello": "Hello! Welcome to The Cookie Jar! I'm Baker Betty, your cookie expert. What delicious treat can I help you find today?",
+            "hello": "Hello! Welcome to Chip Cookies! I'm Chip, your cookie expert. What delicious treat can I help you find today?",
             "hi": "Hi there! Welcome to The Cookie Jar! What kind of cookie are you craving today?",
             "hey": "Hey! Great to see you at The Cookie Jar! What can I get for you today?",
             "good morning": "Good morning! Welcome to The Cookie Jar! Nothing beats fresh cookies to start your day. What would you like?",

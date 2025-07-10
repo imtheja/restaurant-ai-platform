@@ -36,6 +36,7 @@ import toast from 'react-hot-toast';
 
 // Services
 import { chatApi, restaurantApi } from '@services/api';
+import { aiConfigApi } from '@services/aiConfigApi';
 
 // Types
 import { Message, AvatarConfig, ChatMessage, VoicesResponse, Voice } from '../../types';
@@ -119,10 +120,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
     }
   );
 
-  // Get speech configuration to check for text-only mode
-  const { data: speechConfig } = useQuery(
-    ['speechConfig'],
-    () => chatApi.getSpeechConfig(),
+  // Get AI configuration to check for mode and features
+  const { data: aiConfig } = useQuery(
+    ['aiConfig', restaurantSlug],
+    () => aiConfigApi.getAIConfig(restaurantSlug),
     {
       staleTime: 10 * 60 * 1000, // Cache for 10 minutes
     }
@@ -130,10 +131,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
 
   // Automatically disable speech when in text-only mode
   useEffect(() => {
-    if (speechConfig?.data?.text_only_mode) {
+    if (aiConfig?.mode === 'text_only') {
       setSpeechEnabled(false);
     }
-  }, [speechConfig]);
+  }, [aiConfig]);
 
   // Note: Now using streaming instead of mutation for real-time responses
 
@@ -240,7 +241,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
         welcomeContent = "Hi! How can I help?";
       } else {
         // First-time welcome - use short greeting for menu interactions  
-        welcomeContent = "Hi! I'm Baker Betty from The Cookie Jar. What can I help you with?";
+        welcomeContent = restaurantData?.avatar_config?.greeting || "Hi! How can I help you with our menu today?";
         sessionStorage.setItem(welcomeKey, 'true');
       }
 
@@ -588,8 +589,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
       );
     } catch (error) {
       console.error('Streaming error:', error);
+      console.error('Error details:', {
+        message: messageToSend,
+        sessionId,
+        restaurantSlug,
+        error: error instanceof Error ? error.message : error
+      });
       setIsStreamingResponse(false);
-      toast.error('Failed to send message');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
+      toast.error(errorMessage);
       // Remove the failed AI message
       setMessages(prev => prev.filter(msg => msg.id !== aiMessageId));
     }
@@ -614,8 +622,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
     // Basic auto-corrections for common speech recognition errors
     const corrections: { [key: string]: string } = {
       // Common food-related corrections
-      'cookie jar': 'Cookie Jar',
-      'baker betty': 'Baker Betty',
+      'chip cookies': 'Chip Cookies',
+      'chip': 'Chip',
       'semi sweet': 'Semi Sweet',
       'cocoa': 'Cocoa',
       'biscoff': 'Biscoff',
@@ -681,10 +689,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
               {(avatarConfig as any)?.name || 'AI Assistant'}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {speechConfig?.data?.text_only_mode ? 'Text-only mode' : `Voice-enabled chat • ${speechEnabled ? 'Speech ON' : 'Speech OFF'}`}
+              {aiConfig?.mode === 'text_only' ? 'Text-only mode' : `Voice-enabled chat • ${speechEnabled ? 'Speech ON' : 'Speech OFF'}`}
             </Typography>
           </Box>
-            {!speechConfig?.data?.text_only_mode && (
+            {aiConfig?.mode !== 'text_only' && (
               <Tooltip title={speechEnabled ? "Disable speech" : "Enable speech"}>
                 <IconButton onClick={toggleSpeech} color={speechEnabled ? "primary" : "default"}>
                   {speechEnabled ? <VolumeUp /> : <VolumeOff />}
@@ -692,7 +700,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
               </Tooltip>
             )}
             
-            {speechEnabled && !speechConfig?.data?.text_only_mode && (
+            {speechEnabled && aiConfig?.mode !== 'text_only' && (
               <>
                 <Tooltip title="Select voice">
                   <IconButton onClick={handleVoiceMenuClick} color="primary">
@@ -826,7 +834,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 2 }}>
                   <CircularProgress size={16} />
                   <Typography variant="body2" color="text.secondary">
-                    Baker Betty is typing...
+                    {restaurantData?.avatar_config?.name || 'Assistant'} is typing...
                   </Typography>
                 </Box>
               </ListItem>
@@ -847,7 +855,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
               fullWidth
               multiline
               maxRows={3}
-              placeholder={isListening ? "Listening..." : "Ask Baker Betty anything..."}
+              placeholder={isListening ? "Listening..." : `Ask ${restaurantData?.avatar_config?.name || 'our assistant'} anything...`}
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
@@ -871,34 +879,34 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
             />
             <Button
               onClick={isListening ? stopListening : startListening}
-              disabled={isStreamingResponse || speechConfig?.data?.text_only_mode}
+              disabled={isStreamingResponse || aiConfig?.mode === 'text_only'}
               variant="contained"
               startIcon={isListening ? <MicOff /> : <Mic />}
               sx={{ 
                 minWidth: 100,
                 height: 48,
                 borderRadius: '12px',
-                background: speechConfig?.data?.text_only_mode 
+                background: aiConfig?.mode === 'text_only' 
                   ? 'linear-gradient(135deg, #9E9E9E 0%, #757575 100%)'
                   : isListening 
                     ? 'linear-gradient(135deg, #FF6B9D 0%, #FF8E53 100%)' 
                     : 'linear-gradient(135deg, #FF8E53 0%, #FFD93D 100%)',
-                color: speechConfig?.data?.text_only_mode ? '#BDBDBD' : 'white',
+                color: aiConfig?.mode === 'text_only' ? '#BDBDBD' : 'white',
                 border: '2px solid white',
-                boxShadow: speechConfig?.data?.text_only_mode 
+                boxShadow: aiConfig?.mode === 'text_only' 
                   ? '0 2px 6px rgba(0,0,0,0.1)' 
                   : '0 4px 12px rgba(0,0,0,0.2)',
                 fontWeight: 600,
                 fontSize: '16px',
                 textTransform: 'none',
-                opacity: speechConfig?.data?.text_only_mode ? 0.6 : 1,
-                cursor: speechConfig?.data?.text_only_mode ? 'not-allowed' : 'pointer',
+                opacity: aiConfig?.mode === 'text_only' ? 0.6 : 1,
+                cursor: aiConfig?.mode === 'text_only' ? 'not-allowed' : 'pointer',
                 '&:hover': { 
-                  transform: speechConfig?.data?.text_only_mode ? 'none' : 'scale(1.05)',
-                  boxShadow: speechConfig?.data?.text_only_mode 
+                  transform: aiConfig?.mode === 'text_only' ? 'none' : 'scale(1.05)',
+                  boxShadow: aiConfig?.mode === 'text_only' 
                     ? '0 2px 6px rgba(0,0,0,0.1)' 
                     : '0 6px 16px rgba(0,0,0,0.3)',
-                  background: speechConfig?.data?.text_only_mode 
+                  background: aiConfig?.mode === 'text_only' 
                     ? 'linear-gradient(135deg, #9E9E9E 0%, #757575 100%)'
                     : isListening 
                       ? 'linear-gradient(135deg, #FF6B9D 0%, #FF8E53 100%)' 
@@ -916,7 +924,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ restaurantSlug, onChatRea
                 width: 48,
                 height: 48,
                 borderRadius: '12px',
-                background: 'linear-gradient(135deg, #FFD93D 0%, #FF6B9D 100%)',
+                background: 'linear-gradient(135deg, #aa8a40 0%, #d4a854 100%)',
                 color: 'white',
                 border: '2px solid white',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
