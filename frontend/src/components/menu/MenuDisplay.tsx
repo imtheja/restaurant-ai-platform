@@ -13,6 +13,8 @@ import {
 import { useQuery } from 'react-query';
 import { restaurantApi } from '@services/api';
 import MenuItemAIPopup from './MenuItemAIPopup';
+import { chipCookiesMenu } from '@/data/chipCookiesMenu';
+import { useRestaurantTheme } from '@/hooks/useRestaurantTheme';
 
 interface MenuDisplayProps {
   restaurantSlug: string;
@@ -23,6 +25,7 @@ const MenuDisplay: React.FC<MenuDisplayProps> = ({ restaurantSlug, onAIChat }) =
   const [aiPopupAnchor, setAiPopupAnchor] = useState<HTMLElement | null>(null);
   const [selectedMenuItem, setSelectedMenuItem] = useState<any | null>(null);
   const [, ] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const restaurantTheme = useRestaurantTheme(restaurantSlug);
   const { data: menu, isLoading, error } = useQuery(
     ['menu', restaurantSlug],
     () => restaurantApi.getMenu(restaurantSlug),
@@ -69,7 +72,7 @@ const MenuDisplay: React.FC<MenuDisplayProps> = ({ restaurantSlug, onAIChat }) =
 
   return (
     <Box sx={{ 
-      background: 'linear-gradient(135deg, #FFF9E6 0%, #FFF0F5 50%, #F0F8FF 100%)',
+      background: `linear-gradient(135deg, ${restaurantTheme.background} 0%, ${restaurantTheme.accent}40 50%, ${restaurantTheme.secondary}20 100%)`,
       minHeight: '100vh',
       py: 4
     }}>
@@ -83,7 +86,7 @@ const MenuDisplay: React.FC<MenuDisplayProps> = ({ restaurantSlug, onAIChat }) =
             sx={{ 
               mb: 3,
               fontWeight: 700,
-              color: '#8B4513',
+              color: restaurantTheme.primary,
               textAlign: 'center',
               fontSize: { xs: '1.8rem', md: '2.2rem' },
               position: 'relative',
@@ -95,28 +98,27 @@ const MenuDisplay: React.FC<MenuDisplayProps> = ({ restaurantSlug, onAIChat }) =
                 transform: 'translateX(-50%)',
                 width: '80px',
                 height: '4px',
-                background: 'linear-gradient(90deg, #FF6B9D, #FFD93D)',
+                background: restaurantTheme.gradients.button,
                 borderRadius: '2px'
               }
             }}
           >
-            {categoryName === 'Signature Cookies' ? '🍪 Signature Cookies' : 
+            {categoryName === 'Classic Chips' ? '🍪 Classic Chips' : 
+             categoryName === 'Specialty Chips' ? '✨ Specialty Chips' :
+             categoryName === 'Beverages' ? '🥛 Beverages' : 
+             categoryName === 'Signature Cookies' ? '🍪 Signature Cookies' : 
              categoryName === 'Specialty Cookies' ? '✨ Specialty Cookies' :
              categoryName === 'Modifiers' ? '🎆 Sweet Add-Ons' : categoryName}
           </Typography>
           
           <Grid container spacing={3}>
             {items.map((item: any, index: number) => {
-              // Fun colors for each card
-              const cardColors = [
-                { bg: 'linear-gradient(135deg, #FFE4E1 0%, #FFC0CB 100%)', accent: '#FF6B9D' },
-                { bg: 'linear-gradient(135deg, #FFF8DC 0%, #FFE4B5 100%)', accent: '#FF8E53' },
-                { bg: 'linear-gradient(135deg, #F0F8FF 0%, #E6E6FA 100%)', accent: '#9370DB' },
-                { bg: 'linear-gradient(135deg, #F5FFFA 0%, #98FB98 100%)', accent: '#32CD32' },
-                { bg: 'linear-gradient(135deg, #FFFACD 0%, #F0E68C 100%)', accent: '#FFD700' },
-                { bg: 'linear-gradient(135deg, #FFE4E1 0%, #FFDAB9 100%)', accent: '#FF7F50' }
-              ];
-              const colorScheme = cardColors[index % cardColors.length];
+              // Use restaurant theme colors
+              const colorScheme = { 
+                bg: `linear-gradient(135deg, ${restaurantTheme.background} 0%, ${restaurantTheme.accent} 100%)`, 
+                accent: restaurantTheme.primary,
+                hover: restaurantTheme.secondary
+              };
               
               return (
               <Grid item xs={12} md={6} key={item.id}>
@@ -127,11 +129,12 @@ const MenuDisplay: React.FC<MenuDisplayProps> = ({ restaurantSlug, onAIChat }) =
                     transition: 'all 0.3s ease-in-out',
                     position: 'relative',
                     background: colorScheme.bg,
-                    border: `3px solid ${colorScheme.accent}`,
-                    borderRadius: '16px',
+                    border: `2px solid ${colorScheme.accent}30`,
+                    borderRadius: '12px',
+                    boxShadow: `0 4px 12px ${colorScheme.accent}30`,
                     '&:hover': {
-                      transform: 'translateY(-8px) scale(1.02)',
-                      boxShadow: `0 12px 40px rgba(0, 0, 0, 0.15)`,
+                      transform: 'translateY(-4px)',
+                      boxShadow: `0 8px 24px ${colorScheme.accent}40`,
                       borderColor: colorScheme.accent,
                     }
                   }}
@@ -148,24 +151,66 @@ const MenuDisplay: React.FC<MenuDisplayProps> = ({ restaurantSlug, onAIChat }) =
                 >
                   {/* Menu Item Image */}
                   {item.image_url && (
-                    <CardMedia
-                      component="img"
-                      height="200"
-                      image={item.image_url.startsWith('http') ? item.image_url : `${(import.meta.env as any).VITE_MENU_SERVICE_URL || 'http://localhost:8002'}${item.image_url}`}
-                      alt={item.name}
-                      sx={{
-                        objectFit: 'cover',
-                        borderRadius: '12px 12px 0 0',
-                        transition: 'all 0.3s ease',
-                        '&:hover': {
-                          transform: 'scale(1.05)',
+                    <Box sx={{ 
+                      position: 'relative', 
+                      height: '200px', 
+                      overflow: 'hidden',
+                      borderRadius: '12px 12px 0 0'
+                    }}>
+                      <CardMedia
+                        component="img"
+                        height="200"
+                        image={item.image_url.startsWith('http') 
+                          ? item.image_url 
+                          : item.image_url
                         }
-                      }}
-                      onError={(e) => {
-                        // Hide image if loading fails
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
+                        alt={`${item.name} - ${item.description || 'Menu item'}`}
+                        loading="lazy"
+                        sx={{
+                          objectFit: 'cover',
+                          width: '100%',
+                          height: '100%',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            transform: 'scale(1.08)',
+                            filter: 'brightness(1.1)',
+                          }
+                        }}
+                        onError={(e) => {
+                          // Replace with placeholder image
+                          const target = e.target as HTMLImageElement;
+                          target.src = 'data:image/svg+xml,' + encodeURIComponent(`
+                            <svg width="400" height="200" xmlns="http://www.w3.org/2000/svg">
+                              <rect width="100%" height="100%" fill="${colorScheme.accent}20"/>
+                              <text x="50%" y="50%" text-anchor="middle" dy=".3em" 
+                                    font-family="Arial" font-size="16" fill="${colorScheme.accent}">
+                                🍪 ${item.name}
+                              </text>
+                            </svg>
+                          `);
+                          target.alt = `${item.name} - Image unavailable`;
+                        }}
+                      />
+                      
+                      {/* Image overlay for better text readability if needed */}
+                      {item.is_signature && (
+                        <Box sx={{
+                          position: 'absolute',
+                          top: 8,
+                          right: 8,
+                          bgcolor: '#FFD700',
+                          color: '#8B4513',
+                          px: 1,
+                          py: 0.5,
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                        }}>
+                          ⭐ Signature
+                        </Box>
+                      )}
+                    </Box>
                   )}
                   
                   <CardContent sx={{ p: 3 }}>
@@ -175,7 +220,7 @@ const MenuDisplay: React.FC<MenuDisplayProps> = ({ restaurantSlug, onAIChat }) =
                         component="h4"
                         sx={{ 
                           fontWeight: 700,
-                          color: '#8B4513',
+                          color: restaurantTheme.primary,
                           fontSize: '1.4rem'
                         }}
                       >
@@ -190,7 +235,7 @@ const MenuDisplay: React.FC<MenuDisplayProps> = ({ restaurantSlug, onAIChat }) =
                           borderRadius: '12px',
                           fontWeight: 700,
                           fontSize: '1.1rem',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                          boxShadow: `0 2px 8px ${colorScheme.accent}40`
                         }}
                       >
                         ${item.price}
@@ -201,7 +246,7 @@ const MenuDisplay: React.FC<MenuDisplayProps> = ({ restaurantSlug, onAIChat }) =
                       variant="body1" 
                       sx={{ 
                         mb: 2,
-                        color: '#5D4037',
+                        color: restaurantTheme.text,
                         lineHeight: 1.6,
                         fontSize: '1rem'
                       }}
@@ -238,7 +283,7 @@ const MenuDisplay: React.FC<MenuDisplayProps> = ({ restaurantSlug, onAIChat }) =
                       <Typography 
                         variant="caption" 
                         sx={{
-                          color: '#8B4513',
+                          color: restaurantTheme.primary,
                           fontWeight: 500,
                           fontSize: '0.8rem'
                         }}
@@ -264,16 +309,14 @@ const MenuDisplay: React.FC<MenuDisplayProps> = ({ restaurantSlug, onAIChat }) =
           setSelectedMenuItem(null);
         }}
         menuItem={selectedMenuItem || {}}
+        restaurantSlug={restaurantSlug}
         onAskAI={(question, menuItem) => {
-          console.log('MenuDisplay: AI button clicked, question:', question);
           if (onAIChat) {
-            console.log('MenuDisplay: Calling onAIChat with question and menu item context');
             onAIChat(question, menuItem, { 
               source: 'menu_item_popup',
               menu_item: menuItem 
             });
           } else {
-            console.warn('MenuDisplay: onAIChat callback is not available');
           }
         }}
       />

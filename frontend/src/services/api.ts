@@ -436,6 +436,43 @@ export const chatApi = {
       handleApiError(error as AxiosError);
     }
   },
+
+  // New dynamic AI configuration methods
+  getAIConfig: async (restaurantSlug: string) => {
+    try {
+      const response = await aiApi.get(`/api/v1/restaurants/${restaurantSlug}/ai/config`);
+      return handleApiResponse(response);
+    } catch (error) {
+      handleApiError(error as AxiosError);
+    }
+  },
+
+  updateAIConfig: async (restaurantSlug: string, config: any) => {
+    try {
+      const response = await aiApi.put(`/api/v1/restaurants/${restaurantSlug}/ai/config`, config);
+      return handleApiResponse(response);
+    } catch (error) {
+      handleApiError(error as AxiosError);
+    }
+  },
+
+  getAIVoices: async (restaurantSlug: string) => {
+    try {
+      const response = await aiApi.get(`/api/v1/restaurants/${restaurantSlug}/ai/voices`);
+      return handleApiResponse(response);
+    } catch (error) {
+      handleApiError(error as AxiosError);
+    }
+  },
+
+  getAIHealth: async (restaurantSlug: string) => {
+    try {
+      const response = await aiApi.get(`/api/v1/restaurants/${restaurantSlug}/ai/health`);
+      return handleApiResponse(response);
+    } catch (error) {
+      handleApiError(error as AxiosError);
+    }
+  },
 };
 
 // Menu Image API

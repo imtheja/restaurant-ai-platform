@@ -37,6 +37,7 @@ class RestaurantUpdate(BaseSchema):
 class Restaurant(RestaurantBase):
     id: uuid.UUID
     avatar_config: Optional[Dict[str, Any]]
+    theme_config: Optional[Dict[str, Any]] = None
     is_active: bool
     created_at: datetime
     updated_at: datetime

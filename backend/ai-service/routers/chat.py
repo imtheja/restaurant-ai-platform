@@ -19,10 +19,6 @@ from services.ai_service import AIService
 
 router = APIRouter()
 
-@router.options("/restaurants/{restaurant_slug}/chat")
-async def chat_options(restaurant_slug: str = Path(..., description="Restaurant slug")):
-    """Handle CORS preflight requests for chat endpoint"""
-    return {"message": "OK"}
 
 @router.post("/restaurants/{restaurant_slug}/chat", response_model=APIResponse)
 async def chat_with_ai(

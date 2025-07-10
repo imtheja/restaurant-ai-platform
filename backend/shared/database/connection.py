@@ -80,6 +80,12 @@ def get_redis():
         logger.error(f"Redis connection error: {e}")
         return None
 
+def get_redis_client():
+    """
+    FastAPI dependency to get Redis client.
+    """
+    return get_redis()
+
 def init_database():
     """
     Initialize database tables and run any setup scripts.

@@ -1,0 +1,14 @@
+<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="200" fill="#ffffff"/>
+  <!-- Glass -->
+  <path d="M70 60 L70 150 L130 150 L130 60 Z" fill="#ffffff" stroke="#aa8a40" stroke-width="2"/>
+  <!-- Milk -->
+  <rect x="72" y="80" width="56" height="68" fill="#ffffff"/>
+  <!-- Milk foam bubbles -->
+  <circle cx="85" cy="75" r="2" fill="#ede7d4"/>
+  <circle cx="105" cy="77" r="3" fill="#ede7d4"/>
+  <circle cx="95" cy="73" r="2" fill="#ede7d4"/>
+  <circle cx="115" cy="75" r="2" fill="#ede7d4"/>
+  <!-- Text -->
+  <text x="100" y="175" text-anchor="middle" font-family="Arial" font-size="12" fill="#aa8a40">Fresh Milk</text>
+</svg>

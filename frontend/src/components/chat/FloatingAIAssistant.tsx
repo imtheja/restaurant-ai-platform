@@ -13,7 +13,8 @@ import {
 } from '@mui/material';
 import { SmartToy, Close } from '@mui/icons-material';
 import { TransitionProps } from '@mui/material/transitions';
-import ChatInterface from './ChatInterface';
+import DynamicChatInterface from './DynamicChatInterface';
+import { useRestaurantTheme } from '@/hooks/useRestaurantTheme';
 
 const Transition = React.forwardRef(function Transition(
   props: TransitionProps & {
@@ -38,8 +39,13 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
   onOpenChange,
 }) => {
   const [open, setOpen] = useState(false);
+  const [sharedSessionId] = useState(() => `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+  const [visibleChatSendMessage, setVisibleChatSendMessage] = useState<((message: string, context?: any) => void) | null>(null);
+  const [pendingMessage, setPendingMessage] = useState<{message: string, context?: any} | null>(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const restaurantTheme = useRestaurantTheme(restaurantSlug);
+  
 
   const handleOpen = () => {
     setOpen(true);
@@ -58,9 +64,40 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
     }
   }, [shouldAutoOpen, open]);
 
+  // Send pending message when visible chat becomes ready
+  React.useEffect(() => {
+    if (visibleChatSendMessage && pendingMessage && open) {
+      // Add a small delay to ensure the dialog is fully rendered
+      setTimeout(() => {
+        visibleChatSendMessage(pendingMessage.message, pendingMessage.context);
+        setPendingMessage(null);
+      }, 100);
+    }
+  }, [visibleChatSendMessage, pendingMessage, open]);
+
   return (
     <>
-      {/* Hidden ChatInterface for early initialization - no longer needed */}
+      {/* Hidden ChatInterface for onChatReady callback */}
+      <Box sx={{ display: 'none' }}>
+        <DynamicChatInterface
+          restaurantSlug={restaurantSlug}
+          onChatReady={(sendMessage) => {
+            // Forward the sendMessage function to the parent
+            if (onChatReady) {
+              onChatReady((message: string, context?: any) => {
+                // Always open the dialog first
+                if (!open) {
+                  handleOpen();
+                }
+                
+                // Always set as pending message so it gets sent when visible chat is ready
+                setPendingMessage({ message, context });
+              });
+            }
+          }}
+          isEmbedded={true}
+        />
+      </Box>
 
       {/* Floating Action Button */}
       <Fab
@@ -72,25 +109,26 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
           zIndex: 1000,
           width: 80,
           height: 80,
-          background: 'linear-gradient(135deg, #FF6B9D 0%, #FF8E53 50%, #FFD93D 100%)',
-          boxShadow: '0 8px 32px rgba(255, 107, 157, 0.4)',
+          background: restaurantTheme.gradients.fab,
+          boxShadow: `0 8px 32px ${restaurantTheme.primary}50`,
           border: '4px solid white',
           '&:hover': {
-            transform: 'scale(1.15) rotate(5deg)',
-            boxShadow: '0 16px 48px rgba(255, 107, 157, 0.6)',
-            background: 'linear-gradient(135deg, #FF8E53 0%, #FFD93D 50%, #FF6B9D 100%)',
+            transform: 'scale(1.1)',
+            boxShadow: `0 12px 40px ${restaurantTheme.primary}66`,
+            background: restaurantTheme.gradients.fab,
+            filter: 'brightness(1.1)',
           },
           transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
           animation: 'pulse 2s ease-in-out infinite',
           '@keyframes pulse': {
             '0%': {
-              boxShadow: '0 8px 32px rgba(255, 107, 157, 0.4)',
+              boxShadow: `0 8px 32px ${restaurantTheme.primary}66`,
             },
             '50%': {
-              boxShadow: '0 12px 40px rgba(255, 107, 157, 0.6)',
+              boxShadow: `0 12px 40px ${restaurantTheme.primary}80`,
             },
             '100%': {
-              boxShadow: '0 8px 32px rgba(255, 107, 157, 0.4)',
+              boxShadow: `0 8px 32px ${restaurantTheme.primary}66`,
             }
           }
         }}
@@ -120,7 +158,7 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: 'linear-gradient(135deg, #FF6B9D 0%, #FF8E53 50%, #FFD93D 100%)',
+            background: restaurantTheme.gradients.header,
             color: 'white',
             py: 3,
             position: 'relative',
@@ -150,11 +188,11 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
                 boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
               }}
             >
-              <SmartToy sx={{ fontSize: 30, color: '#FF6B9D' }} />
+              <SmartToy sx={{ fontSize: 30, color: restaurantTheme.primary }} />
             </Box>
             <Box>
               <Typography variant="h5" sx={{ fontWeight: 700, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
-                🍪 Baker Betty
+                🍪 Cookie Expert Betty
               </Typography>
               <Typography variant="body2" sx={{ opacity: 0.9, textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}>
                 Your Cookie Expert!
@@ -177,23 +215,10 @@ const FloatingAIAssistant: React.FC<FloatingAIAssistantProps> = ({
         
         <DialogContent sx={{ p: 0, height: '100%', overflow: 'hidden' }}>
           <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <ChatInterface
+            <DynamicChatInterface
               restaurantSlug={restaurantSlug}
               onChatReady={(sendMessage) => {
-                console.log('FloatingAIAssistant: Visible ChatInterface is ready');
-                // Forward the sendMessage function to the parent
-                if (onChatReady) {
-                  onChatReady((message: string, context?: any) => {
-                    // Ensure the dialog is open before sending the message
-                    if (!open) {
-                      handleOpen();
-                      // Wait for the dialog to open, then send the message
-                      setTimeout(() => sendMessage(message, context), 300);
-                    } else {
-                      sendMessage(message, context);
-                    }
-                  });
-                }
+                setVisibleChatSendMessage(() => sendMessage);
               }}
               isEmbedded={true}
             />

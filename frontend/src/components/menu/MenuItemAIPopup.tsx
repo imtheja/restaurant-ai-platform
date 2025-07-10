@@ -9,6 +9,7 @@ import {
   Fade,
 } from '@mui/material';
 import { Cookie, Close, Chat, Info, Warning, Restaurant } from '@mui/icons-material';
+import { useRestaurantTheme } from '@/hooks/useRestaurantTheme';
 
 interface MenuItemAIPopupProps {
   anchorEl: HTMLElement | null;
@@ -23,6 +24,7 @@ interface MenuItemAIPopupProps {
     is_signature?: boolean;
   };
   onAskAI: (question: string, menuItem: any) => void;
+  restaurantSlug: string;
 }
 
 const MenuItemAIPopup: React.FC<MenuItemAIPopupProps> = ({
@@ -31,7 +33,9 @@ const MenuItemAIPopup: React.FC<MenuItemAIPopupProps> = ({
   onClose,
   menuItem,
   onAskAI,
+  restaurantSlug,
 }) => {
+  const theme = useRestaurantTheme(restaurantSlug);
   const handleAskAboutItem = () => {
     const question = `Tell me more about the ${menuItem.name}. What makes it special?`;
     onAskAI(question, menuItem);
@@ -78,10 +82,10 @@ const MenuItemAIPopup: React.FC<MenuItemAIPopupProps> = ({
       TransitionComponent={Fade}
       sx={{
         '& .MuiPopover-paper': {
-          backgroundImage: 'linear-gradient(135deg, #FFF8F3 0%, #FFEFD5 100%)',
-          boxShadow: '0 12px 40px rgba(139, 69, 19, 0.15)',
+          backgroundImage: `linear-gradient(135deg, ${theme.background} 0%, ${theme.accent} 100%)`,
+          boxShadow: `0 12px 40px ${theme.primary}26`,
           borderRadius: 3,
-          border: '2px solid #D2691E',
+          border: `2px solid ${theme.primary}`,
           overflow: 'visible',
         },
       }}
@@ -101,7 +105,7 @@ const MenuItemAIPopup: React.FC<MenuItemAIPopupProps> = ({
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
           <Cookie 
             sx={{ 
-              color: '#D2691E', 
+              color: theme.primary, 
               mr: 1.5,
               fontSize: '1.8rem'
             }} 
@@ -111,20 +115,20 @@ const MenuItemAIPopup: React.FC<MenuItemAIPopupProps> = ({
             sx={{ 
               fontWeight: 700, 
               flex: 1,
-              color: '#8B4513',
+              color: theme.primary,
               fontSize: '1.2rem'
             }}
           >
-            Ask Baker Betty
+            Ask Cookie Expert Betty
           </Typography>
           <IconButton 
             size="small" 
             onClick={onClose} 
             sx={{ 
               ml: 1,
-              color: '#8B4513',
+              color: theme.primary,
               '&:hover': {
-                backgroundColor: 'rgba(139, 69, 19, 0.1)'
+                backgroundColor: `${theme.primary}1A`
               }
             }}
           >
@@ -136,14 +140,14 @@ const MenuItemAIPopup: React.FC<MenuItemAIPopupProps> = ({
           variant="body2" 
           sx={{ 
             mb: 2.5,
-            color: '#5D4037',
+            color: theme.text,
             backgroundColor: 'rgba(255, 255, 255, 0.8)',
             padding: '8px 12px',
             borderRadius: 2,
             textAlign: 'center'
           }}
         >
-          What would you like to know about the <strong style={{ color: '#8B4513' }}>{menuItem.name}</strong>?
+          What would you like to know about the <strong style={{ color: theme.primary }}>{menuItem.name}</strong>?
         </Typography>
         
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.2 }}>
@@ -155,11 +159,11 @@ const MenuItemAIPopup: React.FC<MenuItemAIPopupProps> = ({
             sx={{ 
               justifyContent: 'flex-start', 
               textTransform: 'none',
-              backgroundColor: '#D2691E',
+              backgroundColor: theme.primary,
               color: 'white',
               fontWeight: 600,
               '&:hover': {
-                backgroundColor: '#B8600F'
+                backgroundColor: theme.secondary
               },
               boxShadow: '0 2px 8px rgba(139, 69, 19, 0.2)'
             }}
@@ -175,12 +179,12 @@ const MenuItemAIPopup: React.FC<MenuItemAIPopupProps> = ({
             sx={{ 
               justifyContent: 'flex-start', 
               textTransform: 'none',
-              borderColor: '#D2691E',
-              color: '#8B4513',
+              borderColor: theme.primary,
+              color: theme.primary,
               fontWeight: 600,
               '&:hover': {
-                borderColor: '#B8600F',
-                backgroundColor: 'rgba(210, 105, 30, 0.05)'
+                borderColor: theme.secondary,
+                backgroundColor: `${theme.primary}0D`
               }
             }}
           >
@@ -196,12 +200,12 @@ const MenuItemAIPopup: React.FC<MenuItemAIPopupProps> = ({
               sx={{ 
                 justifyContent: 'flex-start', 
                 textTransform: 'none',
-                borderColor: '#FF6B6B',
-                color: '#D73502',
+                borderColor: theme.primary,
+                color: theme.primary,
                 fontWeight: 600,
                 '&:hover': {
-                  borderColor: '#FF5252',
-                  backgroundColor: 'rgba(255, 107, 107, 0.05)'
+                  borderColor: theme.secondary,
+                  backgroundColor: `${theme.primary}0D`
                 }
               }}
             >
@@ -217,12 +221,12 @@ const MenuItemAIPopup: React.FC<MenuItemAIPopupProps> = ({
             sx={{ 
               justifyContent: 'flex-start', 
               textTransform: 'none',
-              borderColor: '#D2691E',
-              color: '#8B4513',
+              borderColor: theme.primary,
+              color: theme.primary,
               fontWeight: 600,
               '&:hover': {
-                borderColor: '#B8600F',
-                backgroundColor: 'rgba(210, 105, 30, 0.05)'
+                borderColor: theme.secondary,
+                backgroundColor: `${theme.primary}0D`
               }
             }}
           >
@@ -237,12 +241,12 @@ const MenuItemAIPopup: React.FC<MenuItemAIPopupProps> = ({
             sx={{ 
               justifyContent: 'flex-start', 
               textTransform: 'none',
-              borderColor: '#D2691E',
-              color: '#8B4513',
+              borderColor: theme.primary,
+              color: theme.primary,
               fontWeight: 600,
               '&:hover': {
-                borderColor: '#B8600F',
-                backgroundColor: 'rgba(210, 105, 30, 0.05)'
+                borderColor: theme.secondary,
+                backgroundColor: `${theme.primary}0D`
               }
             }}
           >

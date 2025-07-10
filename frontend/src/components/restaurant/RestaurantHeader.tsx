@@ -1,15 +1,18 @@
 import React from 'react';
 import { Box, Typography, Chip, Container } from '@mui/material';
 import { Restaurant } from '../../types';
+import { useRestaurantTheme } from '@/hooks/useRestaurantTheme';
 
 interface RestaurantHeaderProps {
   restaurant: Restaurant;
 }
 
 const RestaurantHeader: React.FC<RestaurantHeaderProps> = ({ restaurant }) => {
+  const restaurantTheme = useRestaurantTheme((restaurant as any).slug);
+  
   return (
     <Box sx={{ 
-      background: 'linear-gradient(135deg, #FF6B9D 0%, #FF8E53 50%, #FFD93D 100%)',
+      background: restaurantTheme.gradients.header,
       color: 'white', 
       py: 6,
       position: 'relative',
@@ -37,7 +40,7 @@ const RestaurantHeader: React.FC<RestaurantHeaderProps> = ({ restaurant }) => {
             letterSpacing: '-0.02em'
           }}
         >
-          🍪 {restaurant.name}
+          🍪 Chip Cookies
         </Typography>
         <Typography 
           variant="h5" 
@@ -55,7 +58,7 @@ const RestaurantHeader: React.FC<RestaurantHeaderProps> = ({ restaurant }) => {
             label={`🎯 ${restaurant.cuisine_type}`}
             sx={{ 
               bgcolor: 'rgba(255,255,255,0.9)',
-              color: '#FF6B9D',
+              color: restaurantTheme.primary,
               fontWeight: 600,
               fontSize: '1rem',
               px: 2,
@@ -67,8 +70,8 @@ const RestaurantHeader: React.FC<RestaurantHeaderProps> = ({ restaurant }) => {
           <Chip 
             label="✨ Fresh Baked Daily"
             sx={{ 
-              bgcolor: 'rgba(255,212,61,0.9)',
-              color: '#8B4513',
+              bgcolor: `${restaurantTheme.accent}E6`,
+              color: restaurantTheme.primary,
               fontWeight: 600,
               fontSize: '1rem',
               px: 2,
@@ -80,7 +83,7 @@ const RestaurantHeader: React.FC<RestaurantHeaderProps> = ({ restaurant }) => {
           <Chip 
             label="🔥 Warm & Gooey"
             sx={{ 
-              bgcolor: 'rgba(255,142,83,0.9)',
+              bgcolor: `${restaurantTheme.secondary}E6`,
               color: 'white',
               fontWeight: 600,
               fontSize: '1rem',

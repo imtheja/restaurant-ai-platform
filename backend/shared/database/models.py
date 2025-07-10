@@ -16,6 +16,7 @@ class Restaurant(Base):
     cuisine_type = Column(String(100))
     description = Column(Text)
     avatar_config = Column(JSON)
+    theme_config = Column(JSON)
     contact_info = Column(JSON)
     settings = Column(JSON)
     is_active = Column(Boolean, default=True)

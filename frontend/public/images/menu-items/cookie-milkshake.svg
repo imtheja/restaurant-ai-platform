@@ -1,0 +1,20 @@
+<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="200" fill="#ffffff"/>
+  <!-- Glass -->
+  <path d="M70 60 L70 160 L130 160 L130 60 Z" fill="#f8f8f8" stroke="#aa8a40" stroke-width="2"/>
+  <!-- Milkshake -->
+  <rect x="72" y="80" width="56" height="78" fill="#ede7d4"/>
+  <!-- Whipped cream -->
+  <ellipse cx="100" cy="70" rx="20" ry="15" fill="#ffffff"/>
+  <ellipse cx="90" cy="60" rx="12" ry="8" fill="#ffffff"/>
+  <ellipse cx="110" cy="65" rx="10" ry="6" fill="#ffffff"/>
+  <!-- Straw -->
+  <rect x="95" y="30" width="4" height="50" fill="#d4a854"/>
+  <!-- Cookie crumbs -->
+  <circle cx="85" cy="100" r="3" fill="#aa8a40"/>
+  <circle cx="105" cy="120" r="2" fill="#aa8a40"/>
+  <circle cx="95" cy="140" r="3" fill="#aa8a40"/>
+  <circle cx="115" cy="110" r="2" fill="#aa8a40"/>
+  <!-- Text -->
+  <text x="100" y="185" text-anchor="middle" font-family="Arial" font-size="12" fill="#aa8a40">Cookie Milkshake</text>
+</svg>

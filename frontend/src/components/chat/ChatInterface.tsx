@@ -36,7 +36,7 @@ import toast from 'react-hot-toast';
 
 // Services
 import { chatApi, restaurantApi } from '@services/api';
-import { aiConfigApi } from '@services/aiConfigApi';
+import { aiConfigApi } from '../../services/aiConfigApi';
 
 // Types
 import { Message, AvatarConfig, ChatMessage, VoicesResponse, Voice } from '../../types';

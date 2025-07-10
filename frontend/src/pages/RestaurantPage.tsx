@@ -115,15 +115,9 @@ const RestaurantPage: React.FC = () => {
             <MenuDisplay 
               restaurantSlug={restaurantSlug!} 
               onAIChat={(question, menuItem, context) => {
-                console.log('RestaurantPage: onAIChat called with question:', question);
-                console.log('RestaurantPage: chatSendMessage state:', chatSendMessage ? 'available' : 'null');
                 if (chatSendMessage) {
-                  setShouldOpenChat(true); // Open the chat first
-                  // Send message with a slight delay to ensure chat is open
-                  setTimeout(() => {
-                    console.log('RestaurantPage: Calling chatSendMessage with question and context:', question, context);
-                    chatSendMessage(question, context);
-                  }, 300);
+                  // Send message immediately - FloatingAIAssistant handles opening and pending messages
+                  chatSendMessage(question, context);
                 } else {
                   console.warn('RestaurantPage: chatSendMessage is not ready, AI functionality may not work yet');
                 }
@@ -140,9 +134,7 @@ const RestaurantPage: React.FC = () => {
             if (!isOpen) setShouldOpenChat(false);
           }}
           onChatReady={(sendMessage) => {
-            console.log('RestaurantPage: onChatReady called with sendMessage:', typeof sendMessage);
             setChatSendMessage(() => sendMessage);
-            console.log('RestaurantPage: Chat is ready, sendMessage function set');
           }}
         />
       </Container>

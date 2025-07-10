@@ -10,7 +10,7 @@ import logging
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'shared'))
 
 from database.connection import init_database, check_database_health
-from routers import chat, conversations, speech
+from routers import chat, conversations, speech, dynamic_chat
 from middleware import rate_limiting, request_logging, error_handling
 
 # Configure logging
@@ -55,16 +55,15 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS - nginx handles it in development, backend handles it in production
-import os
-if os.getenv("RENDER"):  # Only add CORS on Render (production)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["https://restaurant-ai-frontend.onrender.com", "http://localhost:3000", "http://localhost:5173"],
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["*"],
-    )
+# Configure CORS - enable for both development and production
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://restaurant-ai-frontend.onrender.com", "http://localhost:3000", "http://localhost:5173", "http://localhost:3001"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["*"]
+)
 
 # Add security middleware
 app.add_middleware(
@@ -78,6 +77,7 @@ app.middleware("http")(rate_limiting.rate_limit_middleware)
 app.middleware("http")(error_handling.global_exception_handler)
 
 # Include routers
+app.include_router(dynamic_chat.router, prefix="/api/v1", tags=["dynamic-ai"])
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 app.include_router(conversations.router, prefix="/api/v1", tags=["conversations"])
 app.include_router(speech.router, prefix="/api/v1", tags=["speech"])

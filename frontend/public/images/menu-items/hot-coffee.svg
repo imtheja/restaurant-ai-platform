@@ -1,0 +1,16 @@
+<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="200" fill="#ffffff"/>
+  <!-- Coffee cup -->
+  <ellipse cx="100" cy="140" rx="40" ry="8" fill="#d4a854"/>
+  <path d="M60 140 L65 70 L135 70 L140 140 Z" fill="#f8f8f8" stroke="#aa8a40" stroke-width="2"/>
+  <!-- Coffee -->
+  <path d="M65 72 L133 72 L138 138 L62 138 Z" fill="#8B4513"/>
+  <!-- Handle -->
+  <path d="M140 100 Q155 100 155 115 Q155 130 140 130" fill="none" stroke="#aa8a40" stroke-width="2"/>
+  <!-- Steam -->
+  <path d="M85 60 Q85 45 90 50 Q90 35 85 40" fill="none" stroke="#d4a854" stroke-width="2"/>
+  <path d="M100 60 Q100 45 105 50 Q105 35 100 40" fill="none" stroke="#d4a854" stroke-width="2"/>
+  <path d="M115 60 Q115 45 120 50 Q120 35 115 40" fill="none" stroke="#d4a854" stroke-width="2"/>
+  <!-- Text -->
+  <text x="100" y="185" text-anchor="middle" font-family="Arial" font-size="12" fill="#aa8a40">Hot Coffee</text>
+</svg>

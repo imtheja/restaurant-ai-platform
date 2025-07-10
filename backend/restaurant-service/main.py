@@ -48,16 +48,15 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS - nginx handles it in development, backend handles it in production
-import os
-if os.getenv("RENDER"):  # Only add CORS on Render (production)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["https://restaurant-ai-frontend.onrender.com", "http://localhost:3000", "http://localhost:5173"],
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["*"],
-    )
+# Configure CORS - enable for both development and production
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://restaurant-ai-frontend.onrender.com", "http://localhost:3000", "http://localhost:5173", "http://localhost:3001"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["*"]
+)
 
 # Add security middleware
 app.add_middleware(
