@@ -3,17 +3,22 @@ services:
   - type: web
     name: restaurant-ai-frontend
     env: static
-    buildCommand: cd frontend && npm ci && npm run build
+    buildCommand: |
+      cd frontend
+      npm ci --production=false
+      rm -rf dist
+      npm run build
+      ls -la dist/
     staticPublishPath: ./frontend/dist
     routes:
       - type: rewrite
         source: /*
         destination: /index.html
     envVars:
-      - key: NODE_ENV
-        value: production
       - key: GENERATE_SOURCEMAP
         value: false
+      - key: VITE_API_BASE_URL
+        value: https://restaurant-ai-backend.onrender.com
 
   # Backend Service
   - type: web

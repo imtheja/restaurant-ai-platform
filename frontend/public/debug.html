@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug - Restaurant AI Platform</title>
+</head>
+<body>
+    <h1>🔍 Debug Page</h1>
+    <p>If you can see this page, the Render deployment is working but the main app has build issues.</p>
+    <p>Build timestamp: <span id="timestamp"></span></p>
+    <p>Environment: <span id="env"></span></p>
+    
+    <h2>📋 Checklist:</h2>
+    <ul>
+        <li>✅ Static file serving works</li>
+        <li>❓ Check if main assets are generated</li>
+        <li>❓ Check if build completed successfully</li>
+    </ul>
+    
+    <a href="/index.html">← Back to main app</a>
+    
+    <script>
+        document.getElementById('timestamp').textContent = new Date().toISOString();
+        document.getElementById('env').textContent = 'Production';
+    </script>
+</body>
+</html>
