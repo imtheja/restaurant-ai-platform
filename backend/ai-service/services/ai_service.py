@@ -94,11 +94,16 @@ class AIService:
             Restaurant.id == conversation.restaurant_id
         ).first()
         
-        # Check cache for common menu questions first
-        cached_response = await self.cache_service.get_cached_response(
-            restaurant_id=str(restaurant.id),
-            message=message
-        )
+        # Check cache for common menu questions first  
+        # Skip cache for sugar cookie questions to debug
+        if "sugar" not in message.lower():
+            cached_response = await self.cache_service.get_cached_response(
+                restaurant_id=str(restaurant.id),
+                message=message
+            )
+        else:
+            cached_response = None
+            print(f"[DEBUG] Skipping cache for sugar query: {message}")
         
         if cached_response:
             # Record cached AI response
@@ -649,7 +654,11 @@ IMPORTANT:
         cached_menu = db_manager.cache_get(cache_key)
         
         if cached_menu:
-            return safe_json_loads(cached_menu, {})
+            cached_data = safe_json_loads(cached_menu, {})
+            print(f"[DEBUG] Using cached menu context for {restaurant_id}: {len(cached_data.get('categories', []))} categories")
+            return cached_data
+        
+        print(f"[DEBUG] Building fresh menu context for restaurant {restaurant_id}")
         
         # Get categories and items with ingredients
         
@@ -660,6 +669,8 @@ IMPORTANT:
         
         menu_context = {"categories": [], "all_ingredients": [], "allergens": set()}
         
+        print(f"[DEBUG] Found {len(categories)} categories for restaurant {restaurant_id}")
+        
         for category in categories:
             items = self.db.query(MenuItem).filter(
                 MenuItem.restaurant_id == restaurant_id,
@@ -667,8 +678,11 @@ IMPORTANT:
                 MenuItem.is_available == True
             ).order_by(MenuItem.display_order).all()
             
+            print(f"[DEBUG] Category '{category.name}': {len(items)} items")
+            
             category_items = []
             for item in items:
+                print(f"[DEBUG] Item: {item.name} - Available: {item.is_available}")
                 # Get ingredients for this item
                 ingredients = self.db.query(Ingredient).join(MenuItemIngredient).filter(
                     MenuItemIngredient.menu_item_id == item.id
